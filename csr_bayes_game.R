@@ -3,6 +3,7 @@ library(ggplot2)
 library(coda)
 library(mcmcplots)
 
+setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 
 #--------------------------- FUNCTIONS -----------------------------------------
 
@@ -49,8 +50,8 @@ share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,w,z,rho,k=1)
 # 
 # @returns list to be used as `x` argument in demand share() function
 ##
-getTheta <- function(v1 = 1.1, v2 = 1.1, J1 = 30, J2 = 70, p1 = 100, p2 = 100, 
-                  sig1 = 1, sig2 = 0, w = 1.1 , rho = .7, z = NA)
+getTheta <- function(v1 = 1, v2 = 1, J1 = 40, J2 = 60, p1 = 10, p2 = 10, 
+                  sig1 = 1, sig2 = 0, w = 10 , rho = 1, z = NA)
 {
   return(list(v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,sig1=sig1,sig2=sig2,w=w,rho=rho,z=z))
 }
@@ -59,14 +60,15 @@ getTheta <- function(v1 = 1.1, v2 = 1.1, J1 = 30, J2 = 70, p1 = 100, p2 = 100,
 #
 # @returns [data.frame] simulated data for evaluating CSR Bayes game via Gibbs sampling
 ##
-getSimulation <- function(q=.5,Y=2000,N=1000)
+getSimulation <- function(q=.5,Y=2000,N=1000, setSeed=TRUE)
 {
   theta <- getTheta()
   L <- floor(Y/mean(theta$p1,theta$p2))  ## number of purchases each period per person i=1,...,N
   #
-  set.seed(111)
+  if(setSeed)
+    set.seed(111)
   df.sim <- data.frame( z=rbinom(n=N, size = 1, q))
-  df.sim$s <- share(getTheta(z=df.sim$z))
+  df.sim$s <- share.list(getTheta(z=df.sim$z))
   df.sim$G1 <- sapply(df.sim$s, function(x)rbinom(n=1, size = L, x))
   df.sim$G2 <- L - df.sim$G1 
   return(df.sim)
@@ -75,7 +77,7 @@ getSimulation <- function(q=.5,Y=2000,N=1000)
 #------------------ SIMULATE FROM GROUND TRUTH q=.2-----------------------------
 
 
-df.sim <- getSimulation(q=.5)
+df.sim <- getSimulation(q=.5,Y=10000, N=1000)
 
 # ## OVERLAPPING HISTOGRAMS
 # z1 <- ifelse(sum(df.sim$G1[df.sim$z==1])>sum(df.sim$G1[df.sim$z==0]), 1, 0)
@@ -95,25 +97,78 @@ df.sim <- getSimulation(q=.5)
 df <- data.frame()
 for (q in c(0.05, .25,.75,.95)) {
   set.seed(111)
-  df.sim <- getSimulation(q=q, N=5000)
-  df.sim$q <- q
+  df.sim <- getSimulation(q=q, N=5000, Y=20000)
+  df.sim$q <- as.factor(paste0('q = ',q))
   df <- rbind(df,df.sim)
 }
-
+df$z <- as.factor(df$z)
 
 ## FACET WRAP
 ## GGPLOT
-df$z <- as.factor(df$z)
+
 # p1 <- ggplot(aes(x=G1), data=df) +
 #   geom_density(aes(group=z, fill=z),alpha=.5, bw=.8) +
 #   facet_wrap( ~ q, nrow=2 )
 # p1
-p2 <- ggplot(aes(x=G1), data=df) +  
-  geom_histogram(aes(group=z, colour=z, fill=z),alpha=.8, bins=10) +
-  facet_wrap( ~ q, nrow=2 ) + 
-  theme_bw()
-p2
+#--------------------------------------------
+## GGPLOT CURRENTLY BROKEN ???
+# p2 <- ggplot(aes(x=G1, data=df)) +  
+#   geom_histogram(aes(group=z, colour=z, fill=z),alpha=1, bins=15) +
+#   facet_wrap( ~ q, nrow=2 ) + 
+#   xlab('Quantity Demanded from Platform 1') + 
+#   scale_fill_manual(values=c("#003399", "#99bbff")) + 
+#   scale_colour_manual(values=c("#001133", "#0044cc")) +
+#   theme_bw()
+# p2
+# ggsave('demand_by_q_4facet.png',width = 6, height = 4.5, units = 'in', dpi=250)
+#-------------------------------
 
+
+## COMPARE DIFFERENT q effect
+## Run 100 simulations each at 4 value s of q
+runs <- 50
+qvec <- seq(0,1,.1)
+df.comb <- data.frame()
+set.seed(111)
+for (run in 1:runs) {
+    df <- data.frame() 
+    for (q in qvec) {
+        df.sim <- getSimulation(q=q, N=100, Y=100, setSeed = FALSE)
+        df.sim$q <- as.factor(q)
+        df <- rbind(df,df.sim)
+    }
+    df$z <- as.factor(paste0('z=',df$z))
+    df.2 <- rbind(
+        data.frame(Demand=as.integer(df$G1),
+                   z=df$z,
+                   q=df$q,
+                   Platform='Platform=1'),
+        data.frame(Demand=as.integer(df$G2),
+                   z=df$z,
+                   q=df$q,
+                   Platform='Platform=2')
+    )
+    df.counts <- ddply(.data = df.2, .variables = .(z,q,Platform),summarise,counts=sum(Demand))
+    df.comb <- rbind(df.comb,df.counts)
+}
+
+## BW PLOT
+# bwplot(Demand ~ q | Group, data=df.2,
+#        par.settings = list(strip.background=list(col="lightgrey")))
+
+png('csr_demand_q_z_bwplot.png', height=6,width=9, units='in', res=300)
+bwplot(counts ~ q | z + Platform , 
+       data=df.comb,
+       xlab='Proportion of Hedonic Demand (q)',
+       par.settings = list(strip.background=list(col="lightgrey")))
+dev.off()
+
+# bwplot(counts ~ Group | q, 
+#        data=df.comb,
+#        par.settings = list(strip.background=list(col="lightgrey")))
+
+
+# values=c(rgb(.8,.8,.5,.7), rgb(.1,.1,.5,.7))
 
 ## JAGS MODEL  
 modelstring <- "
@@ -125,32 +180,36 @@ model{
     s[i] <- ((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )
     G[i] ~ dbinom(s[i],L)
   }
-  q ~ dbeta(alpha1,alpha2)
-  alpha1 ~ dnorm(a1,0.5)
-  alpha2 ~ dnorm(a2,0.5)
+  q ~ dbeta(h1t,h2t)
 }
 "
 
+
 q <- .5
-N <- 100
+N <- 200
+a1 <- a2 <- 1
+h1 <- 1
+h2 <- 1
 df.sim <- getSimulation(q=q,N=N)
-data <- list(G=df.sim$G1, z=df.sim$z, q=df.sim$q, n=nrow(df.sim), L=L, 
+data <- list(G=df.sim$G1,   L=L, 
+             n=nrow(df.sim),
              sig1=1, sig2=0, v1=1.1,v2=1.1,J1=300,J2=700,p1=10,p2=10,w=1.1,rho=.7,
-             a1=1,a2=1)
+             h1t=a1+h1,h2t=a2+h2)
 
 n.chains <- 3
 model <- jags.model(textConnection(modelstring),data=data,n.adapt=2000,n.chains=n.chains)
 update(model, n.iter=1000)
-output <- coda.samples(model=model, variable.names=c('q','alpha1','alpha2'),n.iter=4000, thin=2)
-print(summary(output))
+output <- coda.samples(model=model, variable.names=c('q'),n.iter=4000, thin=2)
 plot(output)
 mcmcplots::autplot1(output, chain=n.chains)
 mcmcplots::denoverplot(output[[1]],output[[2]])
 mcmcplots::rmeanplot(output)
 mcmcplots::traplot(output)
 
-su <- summary(output)
-su$quantiles['q',c(1,5)]
+(su <- summary(output))
+(ci <- su$quantiles[c(1,5)])
+(hdi <- c(hdi=unname(diff(ci))))
+
 
 out <- list(
   hedonic_buyers=sum(df.sim$z),
@@ -160,14 +219,61 @@ out <- list(
 )
 out
 
+#----------------------------------------------------------------
+
+# modelstring2 <- "
+# model{  
+#   q ~ dbeta(h1t,h2t)
+#   z ~ dbinom(q,n)
+#   qhat <- z/n
+#   th1 <- p2*(v1 + w*sig1*qhat)
+#   th2 <- p1*(v2 + w*sig2*qhat)
+#   s <- ((th1/th2)*pow(J1, rho)) / ( (th1/th2)*pow(J1, rho) + pow(J2, rho) )
+#   G ~ dbinom(s,L)
+# }
+# "
+# 
+# q <- .5
+# N <- 200
+# a1 <- a2 <- 1
+# h1 <- 1
+# h2 <- 1
+# df.sim <- getSimulation(q=q,N=N)
+# data <- list(G=sum(df.sim$G1),  L=L*nrow(df.sim), 
+#              n=nrow(df.sim), 
+#              sig1=1, sig2=0, v1=1.1,v2=1.1,J1=300,J2=700,p1=10,p2=10,w=1.1,rho=.7,
+#              h1t=a1+h1,h2t=a2+h2)
+# 
+# n.chains <- 3
+# model <- jags.model(textConnection(modelstring2),data=data,n.adapt=2000,n.chains=n.chains)
+# update(model, n.iter=1000)
+# output <- coda.samples(model=model, variable.names=c('q'),n.iter=4000, thin=2)
+# print(summary(output))
+# plot(output)
+# mcmcplots::autplot1(output, chain=n.chains)
+# mcmcplots::denoverplot(output[[1]],output[[2]])
+# mcmcplots::rmeanplot(output)
+# mcmcplots::traplot(output)
+# 
+# su <- summary(output)
+# su$quantiles[c(1,5)]
+# 
+# out <- list(
+#   hedonic_buyers=sum(df.sim$z),
+#   revenue=sum(data$p1 * data$G),
+#   cost='?',
+#   profit='?'
+# )
+# out
 
 #------------------------- CSR BAYES GAME ----------------------------------
 # 
 #                   CHANGE ALL DATAFRAME TO LISTS
+# 
 #---------------------------------------------------------------------------
-li <- list(
-    a1=1.1
-  , a2=1.1
+x <- list(
+    v1=1.1
+  , v2=1.1
   , w=1.1
   , rho=.7
   , growth=.01
@@ -181,34 +287,37 @@ li <- list(
 
 N0 <- 1000
 Tau <- 48
-N <- ceiling(1000*(1+li$growth)^Tau)
+N <- ceiling(1000*(1+x$growth)^Tau)
 
 ## allocate game array
-df <- data.frame(p1=rep(10,N), p2=rep(10,N) )
-df$J1 <- 0
-df$J2 <- 0
-df$B1 <- 0
-df$B2 <- 0
-df$M <- NA
-df$z <- NA
-df$g <- NA
-df$G <- NA
-df$sig1 <- NA
-df$sig2 <- NA
-df$s <- NA
+l <- list(
+    M=data.frame(M=rep(NA,Tau))
+  , p=data.frame(p1=rep(10,Tau), p2=rep(10,Tau) )
+  , J=data.frame(J1=rep(0,Tau),J2=rep(0,Tau))
+  , B=data.frame(B1=rep(0,Tau),B2=rep(0,Tau))
+  , sig=data.frame(sig1=rep(NA,Tau), sig2=rep(NA,Tau))
+  , z=matrix(rep(NA,N*Tau),nrow = Tau)
+  , s=matrix(rep(NA,N*Tau),nrow = Tau)
+  , g=matrix(rep(NA,N*Tau),nrow = Tau)
+)
 ## Initial values
-df$sig1[1] <- 1
-df$sig2[1] <- 0
-df$J1[1] <- 300
-df$J2[1] <- 700
-df$M[1] <- 0 + li$db1*df$B1[1] + li$db2*df$B2[1]+ li$dj1*df$J1[1] + li$dj2*df$J2[1]
-df$z[1] <- rbinom(1,1,.5)
+l$sig[1,] <- c(1,0)
+l$J[1,] <- c(30,70)
+l$B[1,] <- c(300,700)
+l$M[1,1] <- 0 + x$db1*l$B$B1[1] + x$db2*l$B$B2[1]+ x$dj1*l$J$J1[1] + x$dj2*l$J$J2[1]
+l$z[1,] <- rbinom(N,1,.5)
+
+L <- ceiling(x$Y / l$p$p1[1])
+
 # LIST demand share
-li$s[[1]] <- share(df$p1[1],df$p2[1],df$v1[1],df$v2[1],df$sig1[1],df$sig2[1],df$J1[1],df$J2[1],
-                li$w[1],df$z[1],df$rho[1],k=1)
-df$g[1] <- sapply(li$s[[1]], function(x)rbinom(n=1, size = li.L, x))
-df$G[1] <- NA
-# drawl first period customers
+l$s[1,] <- share(l$p$p1[1], l$p$p2[1], 
+                   x$v1[1], x$v2[1],
+                   l$sig$sig1[1], l$sig$sig2[1],
+                   l$J$J1[1], l$J$J2[1],
+                   x$w[1], l$z[1,],
+                   x$rho[1],k=1)
+l$g[1,] <- sapply(l$s[1,], function(s)rbinom(n=1, size = L, s))
+# draw first period customers
 df$B1[1] <- 0 + rbinom()
 df$B2[1] <- 0 + 
 
