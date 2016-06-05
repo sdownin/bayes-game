@@ -11,7 +11,7 @@ library(mcmcplots)
 # @argument x [list]; x$z can be n-length vector of {1,0}
 # @returns [vector]  demand share for each x$z
 ##
-share <- function(x,k=1) 
+share.list <- function(x,k=1) 
 {
   out <- sapply(x$z, function(z){
       th1 <- x$p2 * (x$v1 + x$w * x$sig1 * z)
@@ -24,6 +24,23 @@ share <- function(x,k=1)
         denom <- (th2/th1) * x$J2^x$rho  + x$J1^x$rho   
       }   
       return(num / denom)
+  })
+  return(out)
+}
+
+share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,w,z,rho,k=1) 
+{
+  out <- sapply(z, function(z_i){
+    th1 <- p2 * (v1 + w * sig1 * z_i)
+    th2 <- p1 * (v2 + w * sig2 * z_i)
+    if(k==1) {
+      num <- (th1/th2) * J1^rho
+      denom <- (th1/th2) * J1^rho  + J2^rho
+    } else {
+      num <- (th2/th1) * J2^rho
+      denom <- (th2/th1) * J2^rho  + J1^rho   
+    }   
+    return(num / denom)
   })
   return(out)
 }
@@ -145,6 +162,9 @@ out
 
 
 #------------------------- CSR BAYES GAME ----------------------------------
+# 
+#                   CHANGE ALL DATAFRAME TO LISTS
+#---------------------------------------------------------------------------
 li <- list(
     a1=1.1
   , a2=1.1
@@ -152,15 +172,19 @@ li <- list(
   , rho=.7
   , growth=.01
   , Y=1000
+  , db1=.4
+  , db2=.4
+  , dj1=.05
+  , dj2=.05
+  , s=list()
 )
 
 N0 <- 1000
 Tau <- 48
 N <- ceiling(1000*(1+li$growth)^Tau)
-df <- data.frame(
-  p1=rep(10,N), 
-  p2=rep(10,N)
-)
+
+## allocate game array
+df <- data.frame(p1=rep(10,N), p2=rep(10,N) )
 df$J1 <- 0
 df$J2 <- 0
 df$B1 <- 0
@@ -171,9 +195,22 @@ df$g <- NA
 df$G <- NA
 df$sig1 <- NA
 df$sig2 <- NA
-
-
-
+df$s <- NA
+## Initial values
+df$sig1[1] <- 1
+df$sig2[1] <- 0
+df$J1[1] <- 300
+df$J2[1] <- 700
+df$M[1] <- 0 + li$db1*df$B1[1] + li$db2*df$B2[1]+ li$dj1*df$J1[1] + li$dj2*df$J2[1]
+df$z[1] <- rbinom(1,1,.5)
+# LIST demand share
+li$s[[1]] <- share(df$p1[1],df$p2[1],df$v1[1],df$v2[1],df$sig1[1],df$sig2[1],df$J1[1],df$J2[1],
+                li$w[1],df$z[1],df$rho[1],k=1)
+df$g[1] <- sapply(li$s[[1]], function(x)rbinom(n=1, size = li.L, x))
+df$G[1] <- NA
+# drawl first period customers
+df$B1[1] <- 0 + rbinom()
+df$B2[1] <- 0 + 
 
 
 
