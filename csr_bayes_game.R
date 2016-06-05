@@ -1,6 +1,7 @@
 library(rjags)
 library(ggplot2)
 library(coda)
+library(mcmcplots)
 
 
 #--------------------------- FUNCTIONS -----------------------------------------
@@ -112,17 +113,91 @@ model{
   alpha2 ~ dnorm(a2,0.5)
 }
 "
+
 q <- .5
-df.sim <- getSimulation(q=q)
+N <- 100
+df.sim <- getSimulation(q=q,N=N)
 data <- list(G=df.sim$G1, z=df.sim$z, q=df.sim$q, n=nrow(df.sim), L=L, 
              sig1=1, sig2=0, v1=1.1,v2=1.1,J1=300,J2=700,p1=10,p2=10,w=1.1,rho=.7,
              a1=1,a2=1)
-model <- jags.model(textConnection(modelstring),data=data,n.adapt=2000,n.chains=3)
+
+n.chains <- 3
+model <- jags.model(textConnection(modelstring),data=data,n.adapt=2000,n.chains=n.chains)
 update(model, n.iter=1000)
 output <- coda.samples(model=model, variable.names=c('q','alpha1','alpha2'),n.iter=4000, thin=2)
 print(summary(output))
 plot(output)
+mcmcplots::autplot1(output, chain=n.chains)
+mcmcplots::denoverplot(output[[1]],output[[2]])
+mcmcplots::rmeanplot(output)
+mcmcplots::traplot(output)
 
-sum(data$p1 * data$G)
+su <- summary(output)
+su$quantiles['q',c(1,5)]
+
+out <- list(
+  hedonic_buyers=sum(df.sim$z),
+  revenue=sum(data$p1 * data$G),
+  cost='?',
+  profit='?'
+)
+out
+
+
+#------------------------- CSR BAYES GAME ----------------------------------
+li <- list(
+    a1=1.1
+  , a2=1.1
+  , w=1.1
+  , rho=.7
+  , growth=.01
+  , Y=1000
+)
+
+N0 <- 1000
+Tau <- 48
+N <- ceiling(1000*(1+li$growth)^Tau)
+df <- data.frame(
+  p1=rep(10,N), 
+  p2=rep(10,N)
+)
+df$J1 <- 0
+df$J2 <- 0
+df$B1 <- 0
+df$B2 <- 0
+df$M <- NA
+df$z <- NA
+df$g <- NA
+df$G <- NA
+df$sig1 <- NA
+df$sig2 <- NA
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
