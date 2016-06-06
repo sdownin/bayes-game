@@ -310,58 +310,70 @@ ggsave('demand_by_q_z_facets_ribbon_ggplot_4.png', height=3.5,width=7.5,units='i
 
 ## JAGS MODEL  
 
-# getModelstring <- function(sig1,sig2)
-# {
-#   paste0("model{
-#     for (i in 1:n) {
-#       z[i] ~ dbern(q)
-#       th1[i] <- p2*(v1 + w*sig1*z[i])
-#       th2[i] <- p1*(v2 + w*sig2*z[i])
-#       s[i] <- ",ifelse(sig2 > sig1,
-#         "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
-#         "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
-#       ),"
-#       G[i] ~ ",ifelse(sig2 > sig1, 
-#         "L - dbinom(s[i],L)", 
-#         "dbinom(s[i],L)"
-#       ),"
-#     }
-#     q ~ dbeta(h1t,h2t)
-#   }")
-# }
-
-
 getModelstring <- function(sig1,sig2)
 {
   paste0("model{
-      for (i in 1:n) {
-        z[i] ~ dbern(q)
-        th1[i] <- p2*(v1 + w*sig1*z[i])
-        th2[i] <- p1*(v2 + w*sig2*z[i])
-        s[i] <- ((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )
-        G[i] ~ ",ifelse(sig2 > sig1, 
-          "dbinom( 1-s[i], L)", 
-          "dbinom( s[i],  L)"
-        ),"
+    for (i in 1:n) {
+      z[i] ~ dbern(q)
+      th1[i] <- p2*(v1 + w*sig1*z[i])
+      th2[i] <- p1*(v2 + w*sig2*z[i])
+      s[i] <- ",ifelse(sig2 > sig1,
+        "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
+        "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
+      ),"
+      G[i] ~ dbinom(s[i],L)
     }
-  q ~ dbeta(h1t,h2t)
-}")
+    q ~ dbeta(h1t,h2t)
+  }")
+}
+
+
+# getModelstring <- function(sig1,sig2)
+# {
+#   paste0("model{
+#       for (i in 1:n) {
+#         z[i] ~ dbern(q)
+#         th1[i] <- p2*(v1 + w*sig1*z[i])
+#         th2[i] <- p1*(v2 + w*sig2*z[i])
+#         s[i] <- ((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )
+#         G[i] ~ ",ifelse(sig2 > sig1,
+#           "dbinom( 1-s[i], L)",
+#           "dbinom( s[i],  L)"
+#         ),"
+#     }
+#   q ~ dbeta(h1t,h2t)
+# }")
+# }
+
+getModelstring <- function(sig1,sig2)
+{
+  "model{
+    for (i in 1:n) {
+      z[i] ~ dbern(q)
+      th1[i] <- p2*(v1 + w*sig1*z[i])
+      th2[i] <- p1*(v2 + w*sig2*z[i])
+      s[i] <- ((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )
+      G[i] ~ dbinom(s[i],L)
+    }
+    q ~ dbeta(h1t,h2t)
+  }
+  "
 }
 
 ## PARAMS
-q <- .7
+q <- 0
 N <- 500
 a1 <- a2 <- 1
 h1 <- 1
 h2 <- 1
-w <- 11
+w <- 10
 J1 <- 300
 J2 <- 700
 p1 <- p2 <- 10
 v1 <- v2 <- 1.1
 rho <- 1
 sig1 <- 1
-sig2 <- 0
+sig2 <- 1
 Y <- 2000
 theta <- getTheta(v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,w=w,rho=rho,sig1=sig1,sig2=sig2)
 L <- floor(Y/mean(theta$p1,theta$p2))
@@ -379,8 +391,7 @@ n.chains <- 3
 model <- jags.model(textConnection(getModelstring(sig1,sig2)),
                     data=data,n.adapt=3000,n.chains=n.chains )
 update(model, n.iter=1000)
-output <- coda.samples(model=model, variable.names=c('q'),n.iter=6000, thin=3)
-df.output <- sapply(output,function(x)x)
+output <- coda.samples(model=model, variable.names=c('q'),n.iter=3000, thin=3)
 
 fig.name <- paste0('mcmc_diagnostics_UN_q_',q,'_w_',w,'_sig1_',sig1,'_sig2_',sig2,'.png')
 png(fig.name,height=6,width = 8, units = 'in', res = 250)
