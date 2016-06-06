@@ -4,6 +4,7 @@ library(coda)
 library(mcmcplots)
 library(lattice)
 library(latticeExtra)
+library(plyr)
 
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 
@@ -53,7 +54,7 @@ share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,w,z,rho,k=1)
 # @returns list to be used as `x` argument in demand share() function
 ##
 getTheta <- function(v1 = 1, v2 = 1, J1 = 40, J2 = 60, p1 = 10, p2 = 10, 
-                  sig1 = 1, sig2 = 0, w = 10 , rho = 1, z = NA)
+                  sig1 = 1, sig2 = 0, w = 1.5 , rho = 1, z = NA)
 {
   return(list(v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,sig1=sig1,sig2=sig2,w=w,rho=rho,z=z))
 }
@@ -204,7 +205,7 @@ bwplot(counts ~ q | z + Platform ,
        )
 dev.off()
 
-##-----------------------------------------------------
+##-------------- PLOT SIMULATION ---------------------------------------
 ## Run 100 simulations each at 4 value s of q
 runs <- 100
 N <- 500
@@ -220,16 +221,16 @@ for (run in 1:runs) {
     df.sim$q <- q
     df <- rbind(df,df.sim)
   }
-  df$z <- as.factor(paste0('z = ',df$z))
+  df$z <- as.factor(paste0(ifelse(df$z==1,'Hedonic ','Utilitarian '),'(z=',df$z,')'))
   df.2 <- rbind(
     data.frame(Demand=as.integer(df$G1),
                z=df$z,
                q=df$q,
-               Platform='Platform = 1 (CSR)'),
+               Platform='1 (CSR)'),
     data.frame(Demand=as.integer(df$G2),
                z=df$z,
                q=df$q,
-               Platform='Platform = 2 (NO CSR)')
+               Platform='2 (NO CSR)')
   )
   df.counts <- ddply(.data = df.2, .variables = .(z,q,Platform),summarise,counts=sum(Demand))
   li.comb[[run]] <- df.counts
@@ -253,18 +254,18 @@ for (i in levels(df.counts$z)) {
 
 p <- ggplot(aes(x=as.numeric(q),y=mu), data=na.omit(df.ci)) +
   # geom_smooth(aes(x=q, y=counts, colour=z), data=df.comb) +
-  geom_point(aes(colour=z, shape=z)) +
-  geom_line(aes(colour=z, linetype=z)) + 
-  geom_ribbon(aes(group=z,ymin=L99,ymax=U99), alpha=.3) +
-  facet_wrap( ~ Platform) +  
+  geom_point(aes(colour=Platform, shape=Platform)) +
+  geom_line(aes(colour=Platform, linetype=Platform)) + 
+  geom_ribbon(aes(group=Platform,ymin=L99,ymax=U99), alpha=.3) +
+  facet_wrap( ~ z) +  
   xlab('Proportion of Hedonic Buyers (q)') + 
   ylab('Quantity Demanded') +
-  scale_shape_discrete(name="Attitude",labels=c('Hedonic (z=0)','Utilitarian (z=1)')) +
-  scale_linetype_discrete(name="Attitude",labels=c('Hedonic (z=0)','Utilitarian (z=1)')) +
-  scale_colour_discrete(name="Attitude", labels=c('Hedonic (z=0)','Utilitarian (z=1)')) +
+  # scale_shape_discrete(name="Attitude",labels=c('Utilitarian (z=0)','Hedonic (z=1)')) +
+  # scale_linetype_discrete(name="Attitude",labels=c('Utilitarian (z=0)','Hedonic (z=1)')) +
+  # scale_colour_discrete(name="Attitude", labels=c('Utilitarian (z=0)','Hedonic (z=1)')) +
   theme_bw()
 p
-ggsave('demand_by_q_z_facets_ribbon_ggplot_4.png', height=3.5,width=7.5,units='in',dpi=300)
+ggsave('demand_by_q_z_facets_ribbon_ggplot_12.png', height=3.5,width=7.5,units='in',dpi=300)
 
 # png('csr_demand_conf_interval_z_q_plot.png', height=6,width=8, units='in', res=300)
 # df.ci <- na.omit(df.comb)
@@ -483,6 +484,10 @@ getGrowingVector <- function(N0,Tau,growth)
   })
   return(out)
 }
+getPsi <- function(gamma,y,p,B)
+{
+  return(gamma / ((y/p)*B))
+}
 getB <- function(s,m,b,d)
 {
   return(s*m + b*(1-d))
@@ -551,6 +556,43 @@ getQhatEst <- function(mcmc.output, probs, burninProportion=.2)
   return(quantile(samps, probs))
 }
 
+getQstarSig20 <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
+{
+  Qty <- (y/p1) * B1
+  psi <- gamma1 / Qty
+  num <- psi*v1*( p2*(v1+omega)*J1^rho  + p1*v2*J2^rho )
+  denom <- omega*v2*p1*J2^rho * ( r1*rho*c1 - (w1+psi) )
+  return(num/denom)
+}
+getQstarSig21 <- function()
+{
+  
+}
+
+#------------------------ CHECK BEHAVIOR OF QSTAR ------------------------------------
+getQstarSig20(1.5,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,4000)
+
+
+omegavec <- seq(.01,10,length.out = 40)
+rhovec <- seq(.01,2.5,length.out = 40)
+rvec <- seq(.001,.99, length.out = 40)
+cvec <- seq(.01,.99, length.out = 40)
+wvec <- seq(.01,.99, length.out = 40)
+pvec <- seq(1,1000,length.out = 40)
+jvec <- seq(10,10000,length.out = 40)
+bvec <- seq(10,10000,length.out = 40)
+png('qstar_sig2_0.png',height=7,width=7,units='in',res=250)
+  par(mfrow=c(3,3),mar=c(4,4.5,2,1))
+  x <- omegavec; plot(x,getQstarSig20(x,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,4000),type='o',pch=16,xlab=expression(omega),ylab=expression(q^star));abline(h=c(0,1))
+  x <- rhovec; plot(x,getQstarSig20(1.5,x,.1,.5,.05,1,2,100,100,400,600,100,.1,4000),type='o',pch=16,xlab=expression(rho),ylab=expression(q^star));abline(h=c(0,1))
+  x <- rvec; plot(x,getQstarSig20(1.5,1.05,x,.5,.05,1,2,100,100,400,600,100,.1,4000),type='o',pch=16,xlab=expression(r[1]),ylab=expression(q^star));abline(h=c(0,1))
+  x <- cvec; plot(x,getQstarSig20(1.5,1.05,.1,x,.05,1,2,100,100,400,600,100,.1,4000),type='o',pch=16,xlab=expression(c[1]),ylab=expression(q^star));abline(h=c(0,1))
+  x <- wvec; plot(x,getQstarSig20(1.5,1.05,.1,.5,x,1,2,100,100,400,600,100,.1,4000),type='o',pch=16,xlab=expression(w[1]),ylab=expression(q^star));abline(h=c(0,1))
+  x <- pvec; plot(x,getQstarSig20(1.5,1.05,.1,.5,.05,1,2,x,100,400,600,100,.1,4000),type='o',pch=16,xlab=expression(p[1]),ylab=expression(q^star));abline(h=c(0,1))
+  x <- jvec; plot(x,getQstarSig20(1.5,1.05,.1,.5,.05,1,2,100,100,x,600,100,.1,4000),type='o',pch=16,xlab=expression(J[1]),ylab=expression(q^star));abline(h=c(0,1))
+  x <- jvec; plot(x,getQstarSig20(1.5,1.05,.1,.5,.05,1,2,100,100,400,x,100,.1,4000),type='o',pch=16,xlab=expression(J[2]),ylab=expression(q^star));abline(h=c(0,1))
+  x <- bvec; plot(x,getQstarSig20(1.5,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,x),type='o',pch=16,xlab=expression(B[1]),ylab=expression(q^star));abline(h=c(0,1))
+dev.off()
 #-----------------------------------------------
 x <- list(
     v1=1
@@ -565,8 +607,8 @@ x <- list(
   , gamma2=.05  ## seller CSR cost
   , d1=.01      ## Platform operator MARGINAL cost
   , d2=.01      ## Platform operator MARGINAL cost
-  , psi1=.01    ## Platform operator CSR cost
-  , psi2=.01    ## Platform operator CSR cost
+  #, psi1=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
+  #, psi2=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
   , a1=.5
   , a2=1
   , r=.1
@@ -617,22 +659,22 @@ l$qstar$qstar1[1] <- .5 ## ??????????????????
 l$qstar$qstar2[1] <- .5 ## ??????????????????
 
 ## Initial values
-l$p$p1[t] <- 10
-l$p$p2[t] <- 10
-l$sig$sig1[t] <- 1
-l$sig$sig2[t] <- 0
-l$gamma$gamma1 <- ifelse(l$sig$sig1==1, x$gamma1, 0)
-l$gamma$gamma2 <- ifelse(l$sig$sig2==1, x$gamma2, 0)
-l$psi$psi1 <- ifelse(l$sig$sig1==1, x$psi1, 0)
-l$psi$psi2 <- ifelse(l$sig$sig2==1, x$psi2, 0)
 l$J$J1[t] <- 30
 l$J$J2[t] <- 70
 l$B$B1[t] <- 300
 l$B$B1[t] <- 700
+l$p$p1[t] <- 10
+l$p$p2[t] <- 10
+l$sig$sig1[t] <- 1
+l$sig$sig2[t] <- 0
+l$gamma$gamma1[t] <- ifelse(l$sig$sig1==1,x$gamma2, 0)
+l$gamma$gamma2[t] <- ifelse(l$sig$sig2==1, x$gamma2, 0)
+l$psi$psi1[t] <- ifelse(l$sig$sig1==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
+l$psi$psi2[t] <- ifelse(l$sig$sig2==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
 l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
 l$z[[t]] <- rbinom(length(l$z[[t]]), 1, l$qhat$est$mu[t])
-l$L$L1 <- ceiling(x$Y / l$p$p1[t])
-l$L$L2 <- ceiling(x$Y / l$p$p2[t])
+l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
+l$L$L2[t] <- ceiling(x$Y / l$p$p2[t])
 
 # LIST demand share
 l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
