@@ -2,6 +2,8 @@ library(rjags)
 library(ggplot2)
 library(coda)
 library(mcmcplots)
+library(lattice)
+library(latticeExtra)
 
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 
@@ -126,14 +128,14 @@ df$z <- as.factor(df$z)
 
 ## COMPARE DIFFERENT q effect
 ## Run 100 simulations each at 4 value s of q
-runs <- 50
+runs <- 60
 qvec <- seq(0,1,.1)
 df.comb <- data.frame()
 set.seed(111)
 for (run in 1:runs) {
     df <- data.frame() 
     for (q in qvec) {
-        df.sim <- getSimulation(q=q, N=100, Y=100, setSeed = FALSE)
+        df.sim <- getSimulation(q=q, N=60, Y=200, setSeed = FALSE)
         df.sim$q <- as.factor(q)
         df <- rbind(df,df.sim)
     }
@@ -153,22 +155,98 @@ for (run in 1:runs) {
 }
 
 ## BW PLOT
-# bwplot(Demand ~ q | Group, data=df.2,
-#        par.settings = list(strip.background=list(col="lightgrey")))
-
-png('csr_demand_q_z_bwplot.png', height=6,width=9, units='in', res=300)
+png('csr_demand_q_z_bwplot.png', height=6,width=8, units='in', res=300)
 bwplot(counts ~ q | z + Platform , 
        data=df.comb,
        xlab='Proportion of Hedonic Demand (q)',
-       par.settings = list(strip.background=list(col="lightgrey")))
+       col='black',
+       par.settings = list(strip.background=list(col="lightgrey"),
+                           box.umbrella=list(col='black'),
+                           box.rectangle=list(col='black'),
+                           box.dot=list(col='black')
+                           )
+       )
 dev.off()
 
-# bwplot(counts ~ Group | q, 
-#        data=df.comb,
-#        par.settings = list(strip.background=list(col="lightgrey")))
-
-
+##-----------------------------------------------------
+## Run 100 simulations each at 4 value s of q
+runs <- 100
+N <- 500
+Y <- 1000
+qvec <- seq(0,1,.025)
+df.comb <- data.frame()
+li.comb <- list()
+set.seed(111)
+for (run in 1:runs) {
+  df <- data.frame() 
+  for (q in qvec) {
+    df.sim <- getSimulation(q=q, N=N, Y=Y, setSeed = FALSE)
+    df.sim$q <- q
+    df <- rbind(df,df.sim)
+  }
+  df$z <- as.factor(paste0('z = ',df$z))
+  df.2 <- rbind(
+    data.frame(Demand=as.integer(df$G1),
+               z=df$z,
+               q=df$q,
+               Platform='Platform = 1 (CSR)'),
+    data.frame(Demand=as.integer(df$G2),
+               z=df$z,
+               q=df$q,
+               Platform='Platform = 2 (NO CSR)')
+  )
+  df.counts <- ddply(.data = df.2, .variables = .(z,q,Platform),summarise,counts=sum(Demand))
+  li.comb[[run]] <- df.counts
+  df.comb <- rbind(df.comb,df.counts)
+}
 # values=c(rgb(.8,.8,.5,.7), rgb(.1,.1,.5,.7))
+
+# GET RIBBON 95% CREDIBLE INTERVALS
+df.ci <- data.frame(z=NA, q=NA, Platform=NA, L99=NA, mu=NA, U99=NA)
+counter <- 1
+for (i in levels(df.counts$z)) {
+  for (j in unique(df.counts$q)) {
+    for (k in levels(df.counts$Platform)) {
+      x <- df.comb[which(df.comb$z==i & df.comb$q==j & df.comb$Platform==k), 'counts']
+      df.ci[counter,c('z','q','Platform')] <- c(i,j,k)
+      df.ci[counter,c('L99','mu','U99')] <- quantile(na.omit(x), probs = c(.005, .5, .995))
+      counter <- counter + 1
+    }
+  }
+}
+
+p <- ggplot(aes(x=as.numeric(q),y=mu), data=na.omit(df.ci)) +
+  # geom_smooth(aes(x=q, y=counts, colour=z), data=df.comb) +
+  geom_point(aes(colour=z, shape=z)) +
+  geom_line(aes(colour=z, linetype=z)) + 
+  geom_ribbon(aes(group=z,ymin=L99,ymax=U99), alpha=.3) +
+  facet_wrap( ~ Platform) +  
+  xlab('Proportion of Hedonic Buyers (q)') + 
+  ylab('Quantity Demanded') +
+  scale_shape_discrete(name="Attitude",
+                       labels=c('Hedonic\n(z=0)','Utilitarian\n(z=1)')) +
+  scale_linetype_discrete(name="Attitude",
+                       labels=c('Hedonic\n(z=0)','Utilitarian\n(z=1)')) +
+  scale_colour_discrete(name="Attitude",
+                          labels=c('Hedonic\n(z=0)','Utilitarian\n(z=1)')) +
+  theme_bw()
+p
+ggsave('demand_by_q_z_facets_ribbon_ggplot_4.png', height=3.5,width=7,units='in',dpi=300)
+
+# png('csr_demand_conf_interval_z_q_plot.png', height=6,width=8, units='in', res=300)
+# df.ci <- na.omit(df.comb)
+# p <- ggplot(aes(x=q,y=counts), data=df.comb) +
+#   geom_point(aes(colour=Platform)) +
+#   # geom_line(aes(x = q, y=mu), data=df.ci) +
+#   # geom_smooth() +
+#   geom_ribbon(aes(ymin=L95,ymax=U95), data=df.ci,alpha=0.9) +
+#   facet_grid(z ~ Platform) +
+#   xlab('Proportion of Hedonic Demand (q)') +
+#   theme_bw()
+# p
+# dev.off()
+
+
 
 ## JAGS MODEL  
 modelstring <- "
