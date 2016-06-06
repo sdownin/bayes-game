@@ -385,6 +385,8 @@ L <- floor(Y/mean(theta$p1,theta$p2))
 df.sim <- getSimulation(q=q,N=N, theta=theta)
 
 
+
+
 ## z unobserved -----------------------------------------------------
 data <- list(G=df.sim$G1,  L=L, 
              n=nrow(df.sim),  ## NO Z HERE
@@ -510,7 +512,50 @@ getGrowingVector <- function(N0,Tau,growth)
   })
   return(out)
 }
+getB <- function(s,m,b,d)
+{
+  return(s*m + b*(1-d))
+}
+getJ <- function(y,rho,gamma,c,B,f,J,dj)
+{
+  netMargProfit <- ((rho+1)/rho) - (gamma/(rho*c))
+  return(y*netMargProfit*(B/f) + J*(1-dj))
+}
+getG <- function(s,L,M)
+{
+  s.sample <- sample(s,M,replace = F)
+  return( sapply(s.sample, function(s)rbinom(n=1, size = L, s)) )
+}
+getQty <- function(y,p,netB,G)
+{
+  return(netB*(y/p) + G)
+}
+getPi <- function(r,w,psi,rho,c,Q,O,y)
+{
+  netMargProfit <-  r - ( (w+psi)/(rho*c) )
+  return( netMargProfit*Q - (O/y) )
+}
+getQstar <- function()
+{
+  
+}
 
+getQhatMcmc <- function(data, modelstring, variable=c('q'), n.chains=2, n.adapt=3000,n.iter.update=3000, n.iter.sample=3000, thin=3)
+{
+  model <- jags.model(textConnection(getModelstring(data$sig1,data$sig2)),
+                      data=data,n.adapt=n.adapt,n.chains=n.chains )
+  update(model, n.iter=n.iter.update)
+  output <- coda.samples(model=model, variable.names=variables,n.iter=n.iter.samples, thin=thin)
+  return(output)
+}
+
+
+getQhatEst <- function()
+{
+  
+}
+
+#-----------------------------------------------
 x <- list(
     v1=1
   , v2=1
@@ -521,9 +566,13 @@ x <- list(
   , c1=.5
   , c2=.5
   , gamma1=.05
-  , gamma1=.05
-  , psi=.01
-  , psi=.01
+  , gamma2=.05
+  , d1=.01
+  , d2=.01
+  , psi1=.01
+  , psi2=.01
+  , a1=.5
+  , a2=1
   , r=.1
   , w=1
   , rho=.7
@@ -531,78 +580,136 @@ x <- list(
   , Y=1000
   , ep=1e-3
   , N0=1000
-  , Tau=48
+  , Tau=4
+  , probs=c(.005,.025,.5,.975,.995)
 )
 x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
 
 
 ## allocate game array
 l <- list(
-    M=data.frame(M=rep(0,Tau))
-  , qstar=data.frame(M=rep(0,Tau))
-  , qhat=data.frame(M=rep(0,Tau))
-  , p=data.frame(p1=rep(10,Tau), p2=rep(10,Tau))
-  , f=data.frame(f1=rep(1,Tau), f2=rep(1,Tau))
-  , O=data.frame(O1=rep(1,Tau), f2=rep(1,Tau))
-  , J=data.frame(J1=rep(0,Tau),J2=rep(0,Tau))
-  , B=data.frame(B1=rep(0,Tau),B2=rep(0,Tau))
-  , sig=data.frame(sig1=rep(0,Tau), sig2=rep(0,Tau))
-  , Q=data.frame(Q1=rep(0,Tau),Q2=rep(0,Tau))
-  , Pi=data.frame(Pi1=rep(0,Tau),Pi2=rep(0,Tau))
-  , z=getGrowingVector(x$N0,x$Tau,x$Tau)
-  , s=getGrowingVector(x$N0,x$Tau,x$Tau)
-  , g=getGrowingVector(x$N0,x$Tau,x$Tau)
+    M=rep(0,x$Tau)
+  , L=rep(0,x$Tau)
+  , qhat=list(est=data.frame(L99=rep(0,x$Tau),L95=rep(0,x$Tau),
+                             mu=rep(0,x$Tau),
+                             U95=rep(0,x$Tau),U99=rep(0,x$Tau)),
+              mcmc=list())
+  , qstar=data.frame(qstar1=rep(0,x$Tau), qstart2=rep(0,x$Tau))
+  , p=data.frame(p1=rep(10,x$Tau), p2=rep(10,x$Tau))
+  , f=data.frame(f1=rep(1,x$Tau), f2=rep(1,x$Tau))
+  , O=data.frame(O1=rep(1,x$Tau), O2=rep(1,x$Tau))
+  , J=data.frame(J1=rep(0,x$Tau),J2=rep(0,x$Tau))
+  , B=data.frame(B1=rep(0,x$Tau),B2=rep(0,x$Tau))
+  , h=data.frame(h1=rep(0,x$Tau),h2=rep(0,x$Tau))
+  , sig=data.frame(sig1=rep(0,x$Tau), sig2=rep(0,x$Tau))
+  , Q=data.frame(Q1=rep(0,x$Tau),Q2=rep(0,x$Tau))
+  , Pi=data.frame(Pi1=rep(0,x$Tau),Pi2=rep(0,x$Tau))
+  , z=getGrowingVector(x$N0,x$Tau,x$growth)
+  , s=getGrowingVector(x$N0,x$Tau,x$growth)
+  , G=list(G1=list(),G2=list())
 )
+
+t <- 1
+
+## qhat
+l$qhat$est[t, ] <- quantile(rbeta(1e4, x$a1, x$a2), probs = x$probs)
+l$qhat$mcmc[t] <- NA
+l$qstar$qstar1[1] <- .5 ## ??????????????????
+l$qstar$qstar2[1] <- .5 ## ??????????????????
+
 ## Initial values
-l$p$p1[1] <- 10
-l$p$p2[1] <- 10
-l$sig$sig1[1] <- 1
-l$sig$sig2[1] <- 0
-l$J$J1[1] <- 30
-l$J$J2[1] <- 70
-l$B$B1[1] <- 300
-l$B$B1[1] <- 700
-l$M[1] <- 0 + x$db1*l$B$B1[1] + x$db2*l$B$B2[1]+ x$dj1*l$J$J1[1] + x$dj2*l$J$J2[1]
-l$z[[1]] <- rbinom(N,1,.5)
-
-L <- ceiling(x$Y / l$p$p1[1])
-
-
-
-
+l$p$p1[t] <- 10
+l$p$p2[t] <- 10
+l$sig$sig1[t] <- 1
+l$sig$sig2[t] <- 0
+l$J$J1[t] <- 30
+l$J$J2[t] <- 70
+l$B$B1[t] <- 300
+l$B$B1[t] <- 700
+l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
+l$z[[t]] <- rbinom(length(l$z[[t]]),1,l$qhat[t])
+l$L <- ceiling(x$Y / l$p$p1[t])
 
 # LIST demand share
-l$s[[1]] <- share(l$p$p1[1], l$p$p2[1], 
+l$s[[t]] <- share(l$p$p1[1], l$p$p2[1], 
                    x$v1[1], x$v2[1],
                    l$sig$sig1[1], l$sig$sig2[1],
                    l$J$J1[1], l$J$J2[1],
-                   x$w[1], l$z[1,],
+                   x$w[1], l$z[[1]],
                    x$rho[1], k=1)
-l$g[[1]] <- sapply(l$s[1,], function(s)rbinom(n=1, size = L, s))
+l$G$G1[[t]] <- getG(l$s[[1]], l$L[1], l$M[1])
+l$G$G2[[t]] <- l$L[1] - l$G$G1[[1]]
 
-getB <- function(s,m,b,d)
+## Qstar THRESHOLD
+l$qstar$qstar1[t] <- getQstar() ## ??????????????????
+l$qstar$qstar2[t] <- getQstar() ## ??????????????????
+
+## LEARN Qhat
+l$h$h1[t] <- x$ep * ( sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
+l$h$h2[t] <- x$ep * ( sum(sapply(seq_len(t), function(ii)length(l$z[[ii]])))  - sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
+data <- list(G=l$G$G1[t],  L=l$L[t], 
+             n=round(l$M[t]),  ## NO Z HERE
+             sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
+             J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
+             v1=x$v1,v2=x$v2,
+             w=ifelse(l$qhat$est$mu[t]>0, x$w, 0),    ## ensure no signal when q=0
+             rho=x$rho,
+             h1t=x$a1 + l$h$h1[t], h2t=x$a2 + l$h$h2[t])
+l$qhat$mcmc[t] <- getQhatMcmc()
+l$qhat$est[t, ] <- getQhat(l$qhat$mcmc[t])
+
+#### OUTCOME2
+## Quantity
+l$Q$Q1[t] <- getQty(x$Y, l$p$p1[1], l$B$B1[1]*(1-x$db1), sum(l$G$G1[[1]]))
+l$Q$Q2[t] <- getQty(x$Y, l$p$p2[1], l$B$B2[1]*(1-x$db2), sum(l$G$G2[[1]]))
+## Platform Operator Profit
+l$Pi$Pi1 <- getPi(x$r,x$d1,x$psi1,x$rho,x$c1,l$Q$Q1[1], l$O$O1[1], x$Y)
+l$Pi$Pi2 <- getPi(x$r,x$d2,x$psi2,x$rho,x$c2,l$Q$Q2[1], l$O$O2[1], x$Y)
+
+
+for (t in 2:Tau)
 {
-  return(s*m + b*(1-d))
+  ## STRATEGY DECISION VARIABLES
+  l$sig$sig1[t] <- ifelse(l$qhat[t-1] > l$qstar$qstar1[t-1], 1, 0)
+  l$sig$sig2[t] <- ifelse(l$qhat[t-1] > l$qstar$qstar1[t-1], 1, 0)
+  
+  ## PERIOD PARAMETERS
+  l$p$p1[t] <- 10
+  l$p$p2[t] <- 10
+  l$f$f1[t] <- 1
+  l$f$f2[t] <- 1
+  l$J$J1[t] <- getJ(x$Y,x$rho,x$gamma1,x$c1,l$B$B1[t-1],l$f$f1[t],l$J$J1[t-1],x$dj1)   y,rho,gamma,c,B,f,J,dj
+  l$J$J2[t] <- getJ()
+  l$B$B1[t] <- getB()          s,m,b,d
+  l$B$B1[t] <- getG()
+  l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
+  l$z[[t]] <- rbinom(length(l$z[[t]]),1,l$qhat[t])
+  l$L <- ceiling(x$Y / l$p$p1[t])
+  
+  # LIST demand share
+  l$s[[t]] <- share(l$p$p1[1], l$p$p2[1], 
+                    x$v1[1], x$v2[1],
+                    l$sig$sig1[1], l$sig$sig2[1],
+                    l$J$J1[1], l$J$J2[1],
+                    x$w[1], l$z[[1]],
+                    x$rho[1], k=1)
+  l$G$G1[[t]] <- getG(l$s[[1]], l$L[1], l$M[1])
+  l$G$G2[[t]] <- l$L[1] - l$G$G1[[1]]
+  
+  ## LEARN Q
+  l$qstar$qstar1[t] <- getQstar() ## ??????????????????
+  l$qstar$qstar2[t] <- getQstar() ## ??????????????????
+  l$qhat$mcmc[t] <- getQhatMcmc()
+  l$qhat$est[t, ] <- getQhat(l$qhat$mcmc[t])
+  
+  #### OUTCOME2
+  ## Quantity
+  l$Q$Q1[t] <- getQty(x$Y, l$p$p1[1], l$B$B1[1]*(1-x$db1), sum(l$G$G1[[1]]))
+  l$Q$Q2[t] <- getQty(x$Y, l$p$p2[1], l$B$B2[1]*(1-x$db2), sum(l$G$G2[[1]]))
+  ## Platform Operator Profit
+  l$Pi$Pi1 <- getPi(x$r,x$d1,x$psi1,x$rho,x$c1,l$Q$Q1[1], l$O$O1[1], x$Y)
+  l$Pi$Pi2 <- getPi(x$r,x$d2,x$psi2,x$rho,x$c2,l$Q$Q2[1], l$O$O2[1], x$Y)
 }
-getJ <- function(y,rho,gamma,c,B,f,J,dj)
-{
-  netMargProfit <- ((rho+1)/rho) - (gamma/(rho*c))
-  return(y*netMargProfit*(B/f) + J*(1-dj))
-}
-getQ <- function(y,p1,p2,netB,M,s)
-{
-  return()
-}
-getPi <- function()
-{
-  return()
-}
-
-
-
-
-
-
 
 
 
