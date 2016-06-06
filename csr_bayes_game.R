@@ -8,7 +8,51 @@ library(latticeExtra)
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 
 #--------------------------- FUNCTIONS -----------------------------------------
-
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+  
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+  
+  numPlots = length(plots)
+  
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
 ##
 # 
 # @argument x [list]; x$z can be n-length vector of {1,0}
@@ -62,9 +106,10 @@ getTheta <- function(v1 = 1, v2 = 1, J1 = 40, J2 = 60, p1 = 10, p2 = 10,
 #
 # @returns [data.frame] simulated data for evaluating CSR Bayes game via Gibbs sampling
 ##
-getSimulation <- function(q=.5,Y=2000,N=1000, setSeed=TRUE)
+getSimulation <- function(q=.5,Y=2000,N=1000, setSeed=TRUE,theta=NA)
 {
-  theta <- getTheta()
+  if(is.na(theta))
+    theta <- getTheta()
   L <- floor(Y/mean(theta$p1,theta$p2))  ## number of purchases each period per person i=1,...,N
   #
   if(setSeed)
@@ -74,6 +119,24 @@ getSimulation <- function(q=.5,Y=2000,N=1000, setSeed=TRUE)
   df.sim$G1 <- sapply(df.sim$s, function(x)rbinom(n=1, size = L, x))
   df.sim$G2 <- L - df.sim$G1 
   return(df.sim)
+}
+
+##
+#
+#
+##
+getCumuAvg <- function(mcmc.output, n.chains) 
+{
+  output <- mcmc.output
+  df.cumavg <- data.frame(qavg=NA,x=NA,chain=NA)
+  for (run in 1:n.chains) {
+    x <- output[[run]]
+    df.tmp <- data.frame(qavg=cumsum(x)/seq_len(length(x)), 
+                         x=seq_len(length(x)), 
+                         chain=paste0('chain ',run))
+    df.cumavg <- na.omit( rbind(df.cumavg, df.tmp) )
+  }
+  return(df.cumavg)
 }
 
 #------------------ SIMULATE FROM GROUND TRUTH q=.2-----------------------------
@@ -223,15 +286,12 @@ p <- ggplot(aes(x=as.numeric(q),y=mu), data=na.omit(df.ci)) +
   facet_wrap( ~ Platform) +  
   xlab('Proportion of Hedonic Buyers (q)') + 
   ylab('Quantity Demanded') +
-  scale_shape_discrete(name="Attitude",
-                       labels=c('Hedonic\n(z=0)','Utilitarian\n(z=1)')) +
-  scale_linetype_discrete(name="Attitude",
-                       labels=c('Hedonic\n(z=0)','Utilitarian\n(z=1)')) +
-  scale_colour_discrete(name="Attitude",
-                          labels=c('Hedonic\n(z=0)','Utilitarian\n(z=1)')) +
+  scale_shape_discrete(name="Attitude",labels=c('Hedonic (z=0)','Utilitarian (z=1)')) +
+  scale_linetype_discrete(name="Attitude",labels=c('Hedonic (z=0)','Utilitarian (z=1)')) +
+  scale_colour_discrete(name="Attitude", labels=c('Hedonic (z=0)','Utilitarian (z=1)')) +
   theme_bw()
 p
-ggsave('demand_by_q_z_facets_ribbon_ggplot_4.png', height=3.5,width=7,units='in',dpi=300)
+ggsave('demand_by_q_z_facets_ribbon_ggplot_4.png', height=3.5,width=7.5,units='in',dpi=300)
 
 # png('csr_demand_conf_interval_z_q_plot.png', height=6,width=8, units='in', res=300)
 # df.ci <- na.omit(df.comb)
@@ -249,46 +309,91 @@ ggsave('demand_by_q_z_facets_ribbon_ggplot_4.png', height=3.5,width=7,units='in'
 
 
 ## JAGS MODEL  
-modelstring <- "
-model{
-  for (i in 1:n) {
-    z[i] ~ dbern(q)
-    th1[i] <- p2*(v1 + w*sig1*z[i])
-    th2[i] <- p1*(v2 + w*sig2*z[i])
-    s[i] <- ((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )
-    G[i] ~ dbinom(s[i],L)
-  }
+
+# getModelstring <- function(sig1,sig2)
+# {
+#   paste0("model{
+#     for (i in 1:n) {
+#       z[i] ~ dbern(q)
+#       th1[i] <- p2*(v1 + w*sig1*z[i])
+#       th2[i] <- p1*(v2 + w*sig2*z[i])
+#       s[i] <- ",ifelse(sig2 > sig1,
+#         "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
+#         "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
+#       ),"
+#       G[i] ~ ",ifelse(sig2 > sig1, 
+#         "L - dbinom(s[i],L)", 
+#         "dbinom(s[i],L)"
+#       ),"
+#     }
+#     q ~ dbeta(h1t,h2t)
+#   }")
+# }
+
+
+getModelstring <- function(sig1,sig2)
+{
+  paste0("model{
+      for (i in 1:n) {
+        z[i] ~ dbern(q)
+        th1[i] <- p2*(v1 + w*sig1*z[i])
+        th2[i] <- p1*(v2 + w*sig2*z[i])
+        s[i] <- ((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )
+        G[i] ~ ",ifelse(sig2 > sig1, 
+          "dbinom( 1-s[i], L)", 
+          "dbinom( s[i],  L)"
+        ),"
+    }
   q ~ dbeta(h1t,h2t)
+}")
 }
-"
 
-
-q <- .5
-N <- 200
+## PARAMS
+q <- .7
+N <- 500
 a1 <- a2 <- 1
 h1 <- 1
 h2 <- 1
-df.sim <- getSimulation(q=q,N=N)
-data <- list(G=df.sim$G1,   L=L, 
-             n=nrow(df.sim),
-             sig1=1, sig2=0, v1=1.1,v2=1.1,J1=300,J2=700,p1=10,p2=10,w=1.1,rho=.7,
-             h1t=a1+h1,h2t=a2+h2)
+w <- 11
+J1 <- 300
+J2 <- 700
+p1 <- p2 <- 10
+v1 <- v2 <- 1.1
+rho <- 1
+sig1 <- 1
+sig2 <- 0
+Y <- 2000
+theta <- getTheta(v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,w=w,rho=rho,sig1=sig1,sig2=sig2)
+L <- floor(Y/mean(theta$p1,theta$p2))
 
+## SIMULATE DATA
+df.sim <- getSimulation(q=q,N=N)
+
+
+## z unobserved -----------------------------------------------------
+data <- list(G=df.sim$G1,  L=L, 
+             n=nrow(df.sim),  ## NO Z HERE
+             sig1=sig1, sig2=sig2,v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,w=w,rho=rho,
+             h1t=a1+h1,h2t=a2+h2)
 n.chains <- 3
-model <- jags.model(textConnection(modelstring),data=data,n.adapt=2000,n.chains=n.chains)
+model <- jags.model(textConnection(getModelstring(sig1,sig2)),
+                    data=data,n.adapt=3000,n.chains=n.chains )
 update(model, n.iter=1000)
-output <- coda.samples(model=model, variable.names=c('q'),n.iter=4000, thin=2)
-plot(output)
-mcmcplots::autplot1(output, chain=n.chains)
-mcmcplots::denoverplot(output[[1]],output[[2]])
-mcmcplots::rmeanplot(output)
-mcmcplots::traplot(output)
+output <- coda.samples(model=model, variable.names=c('q'),n.iter=6000, thin=3)
+df.output <- sapply(output,function(x)x)
+
+fig.name <- paste0('mcmc_diagnostics_UN_q_',q,'_w_',w,'_sig1_',sig1,'_sig2_',sig2,'.png')
+png(fig.name,height=6,width = 8, units = 'in', res = 250)
+  par(mfrow=c(2,2),mar=c(4,3,2,2))
+  mcmcplots::denplot(output,style = 'plain',auto.layout = F,main="Density of q")
+  mcmcplots::traplot(output,style = 'plain',auto.layout = F,main="Trace of q")
+  mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main="Thinned Running Mean of q")
+  mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main="Autocorrelation of q")
+dev.off()
 
 (su <- summary(output))
 (ci <- su$quantiles[c(1,5)])
 (hdi <- c(hdi=unname(diff(ci))))
-
-
 out <- list(
   hedonic_buyers=sum(df.sim$z),
   revenue=sum(data$p1 * data$G),
@@ -296,6 +401,40 @@ out <- list(
   profit='?'
 )
 out
+
+
+##  z observed -----------------------------------------------------------------
+data <- list(G=df.sim$G1, z=df.sim$z, L=L, 
+             n=nrow(df.sim)-1,
+             sig1=sig1, sig2=sig2,v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,w=w,rho=rho,
+             h1t=a1+h1,h2t=a2+h2)
+n.chains <- 3
+model <- jags.model(textConnection(modelstring),data=data,n.adapt=3000,n.chains=n.chains)
+update(model, n.iter=1000)
+output <- coda.samples(model=model, variable.names=c('q'),n.iter=6000, thin=3)
+
+fig.name <- paste0('mcmc_diagnostics_obs_q_',q,'_w_',w,'_sig1_',sig1,'_sig2_',sig2,'.png')
+  png(fig.name,height=6,width = 8, units = 'in', res = 250)
+  par(mfrow=c(2,2),mar=c(4,3,2,2))
+  mcmcplots::denplot(output,style = 'plain',auto.layout = F,main="Density of q")
+  mcmcplots::traplot(output,style = 'plain',auto.layout = F,main="Trace of q")
+  mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main="Thinned Running Mean of q")
+  mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main="Autocorrelation of q")
+dev.off()
+
+# mcmcplots::denoverplot(output[[1]],output[[2]])
+
+(su <- summary(output))
+(ci <- su$quantiles[c(1,5)])
+(hdi <- c(hdi=unname(diff(ci))))
+out <- list(
+  hedonic_buyers=sum(df.sim$z),
+  revenue=sum(data$p1 * data$G),
+  cost='?',
+  profit='?'
+)
+out
+
 
 #----------------------------------------------------------------
 
