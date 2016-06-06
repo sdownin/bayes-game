@@ -108,7 +108,7 @@ getTheta <- function(v1 = 1, v2 = 1, J1 = 40, J2 = 60, p1 = 10, p2 = 10,
 ##
 getSimulation <- function(q=.5,Y=2000,N=1000, setSeed=TRUE,theta=NA)
 {
-  if(is.na(theta))
+  if(any(is.na(theta)))
     theta <- getTheta()
   L <- floor(Y/mean(theta$p1,theta$p2))  ## number of purchases each period per person i=1,...,N
   #
@@ -118,6 +118,8 @@ getSimulation <- function(q=.5,Y=2000,N=1000, setSeed=TRUE,theta=NA)
   df.sim$s <- share.list(getTheta(z=df.sim$z))
   df.sim$G1 <- sapply(df.sim$s, function(x)rbinom(n=1, size = L, x))
   df.sim$G2 <- L - df.sim$G1 
+  df.sim$sig1 <- theta$sig1
+  df.sim$sig2 <- theta$sig2
   return(df.sim)
 }
 
@@ -310,22 +312,22 @@ ggsave('demand_by_q_z_facets_ribbon_ggplot_4.png', height=3.5,width=7.5,units='i
 
 ## JAGS MODEL  
 
-getModelstring <- function(sig1,sig2)
-{
-  paste0("model{
-    for (i in 1:n) {
-      z[i] ~ dbern(q)
-      th1[i] <- p2*(v1 + w*sig1*z[i])
-      th2[i] <- p1*(v2 + w*sig2*z[i])
-      s[i] <- ",ifelse(sig2 > sig1,
-        "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
-        "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
-      ),"
-      G[i] ~ dbinom(s[i],L)
-    }
-    q ~ dbeta(h1t,h2t)
-  }")
-}
+# getModelstring <- function(sig1,sig2)
+# {
+#   paste0("model{
+#     for (i in 1:n) {
+#       z[i] ~ dbern(q)
+#       th1[i] <- p2*(v1 + w*sig1*z[i])
+#       th2[i] <- p1*(v2 + w*sig2*z[i])
+#       s[i] <- ",ifelse(sig2 > sig1,
+#         "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
+#         "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
+#       ),"
+#       G[i] ~ dbinom(s[i],L)
+#     }
+#     q ~ dbeta(h1t,h2t)
+#   }")
+# }
 
 
 # getModelstring <- function(sig1,sig2)
@@ -361,32 +363,33 @@ getModelstring <- function(sig1,sig2)
 }
 
 ## PARAMS
-q <- 0
+q <- 0.01
 N <- 500
 a1 <- a2 <- 1
 h1 <- 1
 h2 <- 1
-w <- 10
+w <- 0.01
 J1 <- 300
 J2 <- 700
 p1 <- p2 <- 10
 v1 <- v2 <- 1.1
 rho <- 1
 sig1 <- 1
-sig2 <- 1
+sig2 <- 0
 Y <- 2000
-theta <- getTheta(v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,w=w,rho=rho,sig1=sig1,sig2=sig2)
+theta <- getTheta(v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,w=ifelse(q>0,w,0),  ## ensure no signal when q=0
+                  rho=rho,sig1=sig1,sig2=sig2)
 L <- floor(Y/mean(theta$p1,theta$p2))
 
 ## SIMULATE DATA
-df.sim <- getSimulation(q=q,N=N)
+df.sim <- getSimulation(q=q,N=N, theta=theta)
 
 
 ## z unobserved -----------------------------------------------------
 data <- list(G=df.sim$G1,  L=L, 
              n=nrow(df.sim),  ## NO Z HERE
-             sig1=sig1, sig2=sig2,v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,w=w,rho=rho,
-             h1t=a1+h1,h2t=a2+h2)
+             sig1=sig1, sig2=sig2,v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,w=ifelse(q>0,w,0),    ## ensure no signal when q=0
+             rho=rho,h1t=a1+h1,h2t=a2+h2)
 n.chains <- 3
 model <- jags.model(textConnection(getModelstring(sig1,sig2)),
                     data=data,n.adapt=3000,n.chains=n.chains )
@@ -499,59 +502,101 @@ out
 #                   CHANGE ALL DATAFRAME TO LISTS
 # 
 #---------------------------------------------------------------------------
+getGrowingVector <- function(N0,Tau,growth)
+{
+  out <- lapply(seq(0,Tau-1),function(t){
+    n <- ceiling(N0*(1+growth)^t)
+    return(rep(NA,n))
+  })
+  return(out)
+}
+
 x <- list(
-    v1=1.1
-  , v2=1.1
-  , w=1.1
+    v1=1
+  , v2=1
+  , db1=.7  # 30% buy all (y/pk) goods from current platform k; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db2=.7
+  , dj1=.05
+  , dj2=.05
+  , c1=.5
+  , c2=.5
+  , gamma1=.05
+  , gamma1=.05
+  , psi=.01
+  , psi=.01
+  , r=.1
+  , w=1
   , rho=.7
   , growth=.01
   , Y=1000
-  , db1=.4
-  , db2=.4
-  , dj1=.05
-  , dj2=.05
-  , s=list()
+  , ep=1e-3
+  , N0=1000
+  , Tau=48
 )
+x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
 
-N0 <- 1000
-Tau <- 48
-N <- ceiling(1000*(1+x$growth)^Tau)
 
 ## allocate game array
 l <- list(
-    M=data.frame(M=rep(NA,Tau))
-  , p=data.frame(p1=rep(10,Tau), p2=rep(10,Tau) )
+    M=data.frame(M=rep(0,Tau))
+  , qstar=data.frame(M=rep(0,Tau))
+  , qhat=data.frame(M=rep(0,Tau))
+  , p=data.frame(p1=rep(10,Tau), p2=rep(10,Tau))
+  , f=data.frame(f1=rep(1,Tau), f2=rep(1,Tau))
+  , O=data.frame(O1=rep(1,Tau), f2=rep(1,Tau))
   , J=data.frame(J1=rep(0,Tau),J2=rep(0,Tau))
   , B=data.frame(B1=rep(0,Tau),B2=rep(0,Tau))
-  , sig=data.frame(sig1=rep(NA,Tau), sig2=rep(NA,Tau))
-  , z=matrix(rep(NA,N*Tau),nrow = Tau)
-  , s=matrix(rep(NA,N*Tau),nrow = Tau)
-  , g=matrix(rep(NA,N*Tau),nrow = Tau)
+  , sig=data.frame(sig1=rep(0,Tau), sig2=rep(0,Tau))
+  , Q=data.frame(Q1=rep(0,Tau),Q2=rep(0,Tau))
+  , Pi=data.frame(Pi1=rep(0,Tau),Pi2=rep(0,Tau))
+  , z=getGrowingVector(x$N0,x$Tau,x$Tau)
+  , s=getGrowingVector(x$N0,x$Tau,x$Tau)
+  , g=getGrowingVector(x$N0,x$Tau,x$Tau)
 )
 ## Initial values
-l$sig[1,] <- c(1,0)
-l$J[1,] <- c(30,70)
-l$B[1,] <- c(300,700)
-l$M[1,1] <- 0 + x$db1*l$B$B1[1] + x$db2*l$B$B2[1]+ x$dj1*l$J$J1[1] + x$dj2*l$J$J2[1]
-l$z[1,] <- rbinom(N,1,.5)
+l$p$p1[1] <- 10
+l$p$p2[1] <- 10
+l$sig$sig1[1] <- 1
+l$sig$sig2[1] <- 0
+l$J$J1[1] <- 30
+l$J$J2[1] <- 70
+l$B$B1[1] <- 300
+l$B$B1[1] <- 700
+l$M[1] <- 0 + x$db1*l$B$B1[1] + x$db2*l$B$B2[1]+ x$dj1*l$J$J1[1] + x$dj2*l$J$J2[1]
+l$z[[1]] <- rbinom(N,1,.5)
 
 L <- ceiling(x$Y / l$p$p1[1])
 
+
+
+
+
 # LIST demand share
-l$s[1,] <- share(l$p$p1[1], l$p$p2[1], 
+l$s[[1]] <- share(l$p$p1[1], l$p$p2[1], 
                    x$v1[1], x$v2[1],
                    l$sig$sig1[1], l$sig$sig2[1],
                    l$J$J1[1], l$J$J2[1],
                    x$w[1], l$z[1,],
-                   x$rho[1],k=1)
-l$g[1,] <- sapply(l$s[1,], function(s)rbinom(n=1, size = L, s))
-# draw first period customers
-df$B1[1] <- 0 + rbinom()
-df$B2[1] <- 0 + 
+                   x$rho[1], k=1)
+l$g[[1]] <- sapply(l$s[1,], function(s)rbinom(n=1, size = L, s))
 
-
-
-
+getB <- function(s,m,b,d)
+{
+  return(s*m + b*(1-d))
+}
+getJ <- function(y,rho,gamma,c,B,f,J,dj)
+{
+  netMargProfit <- ((rho+1)/rho) - (gamma/(rho*c))
+  return(y*netMargProfit*(B/f) + J*(1-dj))
+}
+getQ <- function(y,p1,p2,netB,M,s)
+{
+  return()
+}
+getPi <- function()
+{
+  return()
+}
 
 
 
