@@ -97,6 +97,21 @@ getCumuAvg <- function(mcmc.output, n.chains)
   return(df.cumavg)
 }
 
+##
+# check if Markov Chain found stationary distribution with Autocorrelation  NHST
+# @returns [data.frame]
+##
+autocorrTestMcmc <- function(mcmc.output, nlags=20, pvalOnly=FALSE, type='Ljung-Box')
+{
+  if (is.na(type) | type != 'Ljung-Box')
+    type <- 'Box-Pierce'
+  tests <- sapply(mcmc.output, function(x)Box.test(x, lag=nlags, type=type))
+  out <- data.frame(t(tests))
+  if(pvalOnly)
+    return( c(p.value.avg=mean(sapply(out$p.value,function(x)x))) )
+  return(out)
+}
+
 #------------------ SIMULATE FROM GROUND TRUTH q=.2-----------------------------
 
 
@@ -319,12 +334,12 @@ getModelstring <- function(sig1,sig2)
 }
 
 ## PARAMS
-q <- 0.01
+q <- 0.2
 N <- 500
 a1 <- a2 <- 1
 h1 <- 1
 h2 <- 1
-w <- 0.01
+w <- 10
 J1 <- 300
 J2 <- 700
 p1 <- p2 <- 10
@@ -477,8 +492,9 @@ getJ <- function(y,rho,gamma,c,B,f,J,dj)
   netMargProfit <- ((rho+1)/rho) - (gamma/(rho*c))
   return(y*netMargProfit*(B/f) + J*(1-dj))
 }
-getG <- function(s,L,M)
+getG <- function(s,L,M,seed=1111)
 {
+  set.seed(seed)
   s.sample <- sample(s,M,replace = F)
   return( sapply(s.sample, function(s)rbinom(n=1, size = L, s)) )
 }
@@ -496,8 +512,27 @@ getQstar <- function()
   
 }
 
-getQhatMcmc <- function(data, modelstring, variable=c('q'), n.chains=2, n.adapt=3000,n.iter.update=3000, n.iter.sample=3000, thin=3)
+getModelstring <- function(sig1,sig2)
 {
+  paste0("model{
+    for (i in 1:n) {
+      z[i] ~ dbern(q)
+      th1[i] <- p2*(v1 + w*sig1*z[i])
+      th2[i] <- p1*(v2 + w*sig2*z[i])
+      s[i] <- ",ifelse(sig2 > sig1,
+        "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
+        "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
+      ),"
+      G[i] ~ dbinom(s[i],L)
+    }
+    q ~ dbeta(h1t,h2t)
+  }")
+}
+
+getQhatMcmc <- function(data, modelstring, variable=c('q'), n.chains=2, n.adapt=3000,n.iter.update=3000, n.iter.sample=3000, thin=3, seed=1111)
+{
+  cat('Starting MCMC . . . ')
+  set.seed(1111)
   model <- jags.model(textConnection(getModelstring(data$sig1,data$sig2)),
                       data=data,n.adapt=n.adapt,n.chains=n.chains )
   update(model, n.iter=n.iter.update)
@@ -506,27 +541,32 @@ getQhatMcmc <- function(data, modelstring, variable=c('q'), n.chains=2, n.adapt=
 }
 
 
-getQhatEst <- function()
+getQhatEst <- function(mcmc.output, probs, burninProportion=.2)
 {
-  
+  samps <- unlist(sapply(mcmc.output,function(x){
+      len <- length(x)
+      burn <- ceiling(burninProportion*len)
+      x[burn:len]
+    }))
+  return(quantile(samps, probs))
 }
 
 #-----------------------------------------------
 x <- list(
     v1=1
   , v2=1
-  , db1=.7  # 30% buy all (y/pk) goods from current platform k; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-  , db2=.7
+  , db1=.7  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db2=.7  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
   , dj1=.05
   , dj2=.05
-  , c1=.5
-  , c2=.5
-  , gamma1=.05
-  , gamma2=.05
-  , d1=.01
-  , d2=.01
-  , psi1=.01
-  , psi2=.01
+  , c1=.5       ## seller MARGINAL cost
+  , c2=.5       ## seller MARGINAL cost
+  , gamma1=.05  ## seller CSR cost
+  , gamma2=.05  ## seller CSR cost
+  , d1=.01      ## Platform operator MARGINAL cost
+  , d2=.01      ## Platform operator MARGINAL cost
+  , psi1=.01    ## Platform operator CSR cost
+  , psi2=.01    ## Platform operator CSR cost
   , a1=.5
   , a2=1
   , r=.1
@@ -538,6 +578,7 @@ x <- list(
   , N0=1000
   , Tau=4
   , probs=c(.005,.025,.5,.975,.995)
+  , learningThreshold=.05
 )
 x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
 
@@ -545,13 +586,14 @@ x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
 ## allocate game array
 l <- list(
     M=rep(0,x$Tau)
-  , L=rep(0,x$Tau)
-  , qhat=list(est=data.frame(L99=rep(0,x$Tau),L95=rep(0,x$Tau),
+  , qhat=list(mcmc=list(),
+              est=data.frame(L99=rep(0,x$Tau),L95=rep(0,x$Tau),
                              mu=rep(0,x$Tau),
-                             U95=rep(0,x$Tau),U99=rep(0,x$Tau)),
-              mcmc=list())
+                             U95=rep(0,x$Tau),U99=rep(0,x$Tau)))
   , qstar=data.frame(qstar1=rep(0,x$Tau), qstart2=rep(0,x$Tau))
   , p=data.frame(p1=rep(10,x$Tau), p2=rep(10,x$Tau))
+  , gamma=data.frame(gamma1=rep(10,x$Tau), gamma2=rep(10,x$Tau))
+  , psi=data.frame(psi1=rep(10,x$Tau), psi2=rep(10,x$Tau))
   , f=data.frame(f1=rep(1,x$Tau), f2=rep(1,x$Tau))
   , O=data.frame(O1=rep(1,x$Tau), O2=rep(1,x$Tau))
   , J=data.frame(J1=rep(0,x$Tau),J2=rep(0,x$Tau))
@@ -567,7 +609,8 @@ l <- list(
 
 t <- 1
 
-## qhat
+#--------------------------------- INITIAL PERIOD ------------------------------------------
+## TEMP VALUES TO BE REPLACED BY LEARNING AFTER INITAL PERIOD
 l$qhat$est[t, ] <- quantile(rbeta(1e4, x$a1, x$a2), probs = x$probs)
 l$qhat$mcmc[t] <- NA
 l$qstar$qstar1[1] <- .5 ## ??????????????????
@@ -578,13 +621,18 @@ l$p$p1[t] <- 10
 l$p$p2[t] <- 10
 l$sig$sig1[t] <- 1
 l$sig$sig2[t] <- 0
+l$gamma$gamma1 <- ifelse(l$sig$sig1==1, x$gamma1, 0)
+l$gamma$gamma2 <- ifelse(l$sig$sig2==1, x$gamma2, 0)
+l$psi$psi1 <- ifelse(l$sig$sig1==1, x$psi1, 0)
+l$psi$psi2 <- ifelse(l$sig$sig2==1, x$psi2, 0)
 l$J$J1[t] <- 30
 l$J$J2[t] <- 70
 l$B$B1[t] <- 300
 l$B$B1[t] <- 700
 l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
 l$z[[t]] <- rbinom(length(l$z[[t]]), 1, l$qhat$est$mu[t])
-l$L <- ceiling(x$Y / l$p$p1[t])
+l$L$L1 <- ceiling(x$Y / l$p$p1[t])
+l$L$L2 <- ceiling(x$Y / l$p$p2[t])
 
 # LIST demand share
 l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
@@ -593,17 +641,15 @@ l$s[[t]] <- share(l$p$p1[t], l$p$p2[t],
                    l$J$J1[t], l$J$J2[t],
                    x$w[t], l$z[[t]],
                    x$rho[t], k=1)
-l$G$G1[[t]] <- getG(l$s[[t]], l$L[t], l$M[t])
-l$G$G2[[t]] <- l$L[t] - l$G$G1[[t]]
+l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
+l$G$G2[[t]] <- getG( 1-l$s[[t]], l$L$L2[t], l$M[t])
 
 ## Qstar THRESHOLD
 l$qstar$qstar1[t] <- getQstar() ## ??????????????????
 l$qstar$qstar2[t] <- getQstar() ## ??????????????????
 
 ## LEARN Qhat
-l$h$h1[t] <- x$ep * ( sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
-l$h$h2[t] <- x$ep * ( sum(sapply(seq_len(t), function(ii)length(l$z[[ii]])))  - sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
-data <- list(G=l$G$G1[t],  L=l$L[t], 
+data <- list(G=l$G$G1[t],  L=l$L$L1[t], 
              n=round(l$M[t]),  ## NO Z HERE
              sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
              J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
@@ -611,36 +657,61 @@ data <- list(G=l$G$G1[t],  L=l$L[t],
              w=ifelse(l$qhat$est$mu[t]>0, x$w, 0),    ## ensure no signal when q=0
              rho=x$rho,
              h1t=x$a1 + l$h$h1[t], h2t=x$a2 + l$h$h2[t])
-l$qhat$mcmc[t] <- getQhatMcmc()
-l$qhat$est[t, ] <- getQhat(l$qhat$mcmc[t])
+modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
+l$qhat$mcmc[t] <- getQhatMcmc(data, modelstring, variable=c('q'), 
+                              n.chains=3, n.adapt=3000,n.iter.update=3000, 
+                              n.iter.sample=3000, thin=3, seed=1111)
+l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[t], probs=x$probs, burninProportion = .2)
+
+## TEST LEARNING VIA AUTOCORRELATION
+# l$h$h1[t] <- x$ep * ( sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
+# l$h$h2[t] <- x$ep * ( sum(sapply(seq_len(t), function(ii)length(l$z[[ii]])))  - sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
+ac <- autocorrTestMcmc(l$qhat$mcmc, nlags=20, pvalOnly=T, type='Ljung-Box')
+if ( ac > x$learningThreshold) {
+  l$h$h1[t] <- x$ep *  sum(l$z[[t]]) 
+  l$h$h2[t] <- x$ep * ( length(l$z[[t]]) -  sum(l$z[[t]]) )
+} else {
+  l$h$h1[t] <- 0
+  l$h$h2[t] <- 0
+}
 
 #### OUTCOME2
 ## Quantity
 l$Q$Q1[t] <- getQty(x$Y, l$p$p1[t], l$B$B1[t]*(1-x$db1), sum(l$G$G1[[t]]))
 l$Q$Q2[t] <- getQty(x$Y, l$p$p2[t], l$B$B2[t]*(1-x$db2), sum(l$G$G2[[t]]))
 ## Platform Operator Profit
-l$Pi$Pi1 <- getPi(x$r,x$d1,x$psi1,x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
-l$Pi$Pi2 <- getPi(x$r,x$d2,x$psi2,x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
+l$Pi$Pi1 <- getPi(x$r,x$d1,l$psi$psi1[t],x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
+l$Pi$Pi2 <- getPi(x$r,x$d2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
 
-
+#---------------------------------- MAIN GAME LOOP ----------------------------------------------
 for (t in 2:Tau)
 {
   ## STRATEGY DECISION VARIABLES
-  l$sig$sig1[t] <- ifelse(l$qhat[t-1] > l$qstar$qstar1[t-1], 1, 0)
-  l$sig$sig2[t] <- ifelse(l$qhat[t-1] > l$qstar$qstar1[t-1], 1, 0)
+  l$sig$sig1[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t-1], 1, 0)
+  l$sig$sig2[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t-1], 1, 0)
+  
+  ## CSR CONTINGENT COSTS
+  l$gamma$gamma1 <- ifelse(l$sig$sig1==1, x$gamma1, 0)
+  l$gamma$gamma2 <- ifelse(l$sig$sig2==1, x$gamma2, 0)
+  l$psi$psi1 <- ifelse(l$sig$sig1==1, x$psi1, 0)
+  l$psi$psi2 <- ifelse(l$sig$sig2==1, x$psi2, 0)
   
   ## PERIOD PARAMETERS
   l$p$p1[t] <- 10
   l$p$p2[t] <- 10
   l$f$f1[t] <- 1
   l$f$f2[t] <- 1
-  l$J$J1[t] <- getJ(x$Y,x$rho,x$gamma1,x$c1,l$B$B1[t-1],l$f$f1[t],l$J$J1[t-1],x$dj1)   y,rho,gamma,c,B,f,J,dj
-  l$J$J2[t] <- getJ()
-  l$B$B1[t] <- getB()          s,m,b,d
-  l$B$B1[t] <- getG()
-  l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
+  l$L$L1 <- ceiling(x$Y / l$p$p1[t])
+  l$L$L2 <- ceiling(x$Y / l$p$p2[t])
+  ## PREVIOS PERIOD DEPENDENT UPDATES
+  l$M[t] <- 0 + x$db1*l$B$B1[t-1] + x$db2*l$B$B2[t-1]+ x$dj1*l$J$J1[t-1] + x$dj2*l$J$J2[t-1]
+  l$J$J1[t] <- getJ(x$Y,x$rho,l$gamma$gamma1[t],x$c1,l$B$B1[t-1],l$f$f1[t],l$J$J1[t-1],x$dj1) 
+  l$J$J2[t] <- getJ(x$Y,x$rho,l$gamma$gamma2[t],x$c2,l$B$B2[t-1],l$f$f2[t],l$J$J2[t-1],x$dj2)
+  l$B$B1[t] <- getB(l$s[[t-1]], l$M[[t]], l$B$B1[t], x$db1)         
+  l$B$B1[t] <- getB(l$s[[t-1]], l$M[[t]], l$B$B1[t], x$db1) 
+  
+  # SAMPLE MARKET ATTITUDES
   l$z[[t]] <- rbinom(length(l$z[[t]]),1,l$qhat[t])
-  l$L <- ceiling(x$Y / l$p$p1[t])
   
   # LIST demand share
   l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
@@ -649,24 +720,49 @@ for (t in 2:Tau)
                     l$J$J1[t], l$J$J2[t],
                     x$w[t], l$z[[t]],
                     x$rho[t], k=1)
-  l$G$G1[[t]] <- getG(l$s[[t]], l$L[t], l$M[t])
-  l$G$G2[[t]] <- l$L[t] - l$G$G1[[t]]
+  l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
+  l$G$G2[[t]] <- getG(1-l$s[[t]], l$L$L2[t], l$M[t])
   
-  ## LEARN Q
+  ## LEARN Qhat
+  data <- list(G=l$G$G1[t],  L=l$L$L1[t], 
+               n=round(l$M[t]),  ## NO Z HERE
+               sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
+               J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
+               v1=x$v1,v2=x$v2,
+               w=ifelse(l$qhat$est$mu[t]>0, x$w, 0),    ## ensure no signal when q=0
+               rho=x$rho,
+               h1t=x$a1 + l$h$h1[t], h2t=x$a2 + l$h$h2[t])
+  modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
+  l$qhat$mcmc[t] <- getQhatMcmc(data, modelstring, variable=c('q'), 
+                                n.chains=3, n.adapt=3000,n.iter.update=3000, 
+                                n.iter.sample=3000, thin=3, seed=1111)
+  l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[t], probs=x$probs, burninProportion = .2)
+  
+  
   l$qstar$qstar1[t] <- getQstar() ## ??????????????????
-  l$qstar$qstar2[t] <- getQstar() ## ??????????????????
-  l$qhat$mcmc[t] <- getQhatMcmc()
-  l$qhat$est[t, ] <- getQhat(l$qhat$mcmc[t])
+  l$qstar$qstar2[t] <- getQstar() ## ??????????????????  
+  
+  
+  ## TEST LEARNING VIA AUTOCORRELATION
+  ## IF STRATEGIES ARE  THE SAME, AUTOCORRELATION SHOULD BE SIGNIFICANT --> DON'T COUNT THIS PERIOD z SAMPLE
+  ac <- autocorrTestMcmc(l$qhat$mcmc, nlags=20, pvalOnly=T, type='Ljung-Box')
+  if (  ac > x$learningThreshold ) {
+    l$h$h1[t] <- x$ep*sum(l$z[[t]])  + l$h$h1[t-1]
+    l$h$h2[t] <- x$ep*( length(l$z[[t]]) - sum(l$z[[t]]) ) + l$h$h2[t-1]
+  } else {
+    l$h$h1[t] <- l$h$h1[t-1]
+    l$h$h2[t] <- l$h$h2[t-1]
+  }
   
   #### OUTCOME2
   ## Quantity
   l$Q$Q1[t] <- getQty(x$Y, l$p$p1[t], l$B$B1[t]*(1-x$db1), sum(l$G$G1[[t]]))
   l$Q$Q2[t] <- getQty(x$Y, l$p$p2[t], l$B$B2[t]*(1-x$db2), sum(l$G$G2[[t]]))
   ## Platform Operator Profit
-  l$Pi$Pi1 <- getPi(x$r,x$d1,x$psi1,x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
-  l$Pi$Pi2 <- getPi(x$r,x$d2,x$psi2,x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
+  l$Pi$Pi1 <- getPi(x$r,x$d1,l$psi$psi1[t],x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
+  l$Pi$Pi2 <- getPi(x$r,x$d2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
 }
-
+#---------------------------------------------------------------------------------
 
 
 
