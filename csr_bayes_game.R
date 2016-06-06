@@ -8,51 +8,7 @@ library(latticeExtra)
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 
 #--------------------------- FUNCTIONS -----------------------------------------
-# Multiple plot function
-#
-# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
-# - cols:   Number of columns in layout
-# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
-#
-# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
-# then plot 1 will go in the upper left, 2 will go in the upper right, and
-# 3 will go all the way across the bottom.
-#
-multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  library(grid)
-  
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
-  
-  numPlots = length(plots)
-  
-  # If layout is NULL, then use 'cols' to determine layout
-  if (is.null(layout)) {
-    # Make the panel
-    # ncol: Number of columns of plots
-    # nrow: Number of rows needed, calculated from # of cols
-    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                     ncol = cols, nrow = ceiling(numPlots/cols))
-  }
-  
-  if (numPlots==1) {
-    print(plots[[1]])
-    
-  } else {
-    # Set up the page
-    grid.newpage()
-    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
-    
-    # Make each plot, in the correct location
-    for (i in 1:numPlots) {
-      # Get the i,j matrix positions of the regions that contain this subplot
-      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
-      
-      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
-    }
-  }
-}
+
 ##
 # 
 # @argument x [list]; x$z can be n-length vector of {1,0}
@@ -627,18 +583,18 @@ l$J$J2[t] <- 70
 l$B$B1[t] <- 300
 l$B$B1[t] <- 700
 l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
-l$z[[t]] <- rbinom(length(l$z[[t]]),1,l$qhat[t])
+l$z[[t]] <- rbinom(length(l$z[[t]]), 1, l$qhat$est$mu[t])
 l$L <- ceiling(x$Y / l$p$p1[t])
 
 # LIST demand share
-l$s[[t]] <- share(l$p$p1[1], l$p$p2[1], 
-                   x$v1[1], x$v2[1],
-                   l$sig$sig1[1], l$sig$sig2[1],
-                   l$J$J1[1], l$J$J2[1],
-                   x$w[1], l$z[[1]],
-                   x$rho[1], k=1)
-l$G$G1[[t]] <- getG(l$s[[1]], l$L[1], l$M[1])
-l$G$G2[[t]] <- l$L[1] - l$G$G1[[1]]
+l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
+                   x$v1[t], x$v2[t],
+                   l$sig$sig1[t], l$sig$sig2[t],
+                   l$J$J1[t], l$J$J2[t],
+                   x$w[t], l$z[[t]],
+                   x$rho[t], k=1)
+l$G$G1[[t]] <- getG(l$s[[t]], l$L[t], l$M[t])
+l$G$G2[[t]] <- l$L[t] - l$G$G1[[t]]
 
 ## Qstar THRESHOLD
 l$qstar$qstar1[t] <- getQstar() ## ??????????????????
@@ -660,11 +616,11 @@ l$qhat$est[t, ] <- getQhat(l$qhat$mcmc[t])
 
 #### OUTCOME2
 ## Quantity
-l$Q$Q1[t] <- getQty(x$Y, l$p$p1[1], l$B$B1[1]*(1-x$db1), sum(l$G$G1[[1]]))
-l$Q$Q2[t] <- getQty(x$Y, l$p$p2[1], l$B$B2[1]*(1-x$db2), sum(l$G$G2[[1]]))
+l$Q$Q1[t] <- getQty(x$Y, l$p$p1[t], l$B$B1[t]*(1-x$db1), sum(l$G$G1[[t]]))
+l$Q$Q2[t] <- getQty(x$Y, l$p$p2[t], l$B$B2[t]*(1-x$db2), sum(l$G$G2[[t]]))
 ## Platform Operator Profit
-l$Pi$Pi1 <- getPi(x$r,x$d1,x$psi1,x$rho,x$c1,l$Q$Q1[1], l$O$O1[1], x$Y)
-l$Pi$Pi2 <- getPi(x$r,x$d2,x$psi2,x$rho,x$c2,l$Q$Q2[1], l$O$O2[1], x$Y)
+l$Pi$Pi1 <- getPi(x$r,x$d1,x$psi1,x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
+l$Pi$Pi2 <- getPi(x$r,x$d2,x$psi2,x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
 
 
 for (t in 2:Tau)
@@ -687,14 +643,14 @@ for (t in 2:Tau)
   l$L <- ceiling(x$Y / l$p$p1[t])
   
   # LIST demand share
-  l$s[[t]] <- share(l$p$p1[1], l$p$p2[1], 
-                    x$v1[1], x$v2[1],
-                    l$sig$sig1[1], l$sig$sig2[1],
-                    l$J$J1[1], l$J$J2[1],
-                    x$w[1], l$z[[1]],
-                    x$rho[1], k=1)
-  l$G$G1[[t]] <- getG(l$s[[1]], l$L[1], l$M[1])
-  l$G$G2[[t]] <- l$L[1] - l$G$G1[[1]]
+  l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
+                    x$v1[t], x$v2[t],
+                    l$sig$sig1[t], l$sig$sig2[t],
+                    l$J$J1[t], l$J$J2[t],
+                    x$w[t], l$z[[t]],
+                    x$rho[t], k=1)
+  l$G$G1[[t]] <- getG(l$s[[t]], l$L[t], l$M[t])
+  l$G$G2[[t]] <- l$L[t] - l$G$G1[[t]]
   
   ## LEARN Q
   l$qstar$qstar1[t] <- getQstar() ## ??????????????????
@@ -704,11 +660,11 @@ for (t in 2:Tau)
   
   #### OUTCOME2
   ## Quantity
-  l$Q$Q1[t] <- getQty(x$Y, l$p$p1[1], l$B$B1[1]*(1-x$db1), sum(l$G$G1[[1]]))
-  l$Q$Q2[t] <- getQty(x$Y, l$p$p2[1], l$B$B2[1]*(1-x$db2), sum(l$G$G2[[1]]))
+  l$Q$Q1[t] <- getQty(x$Y, l$p$p1[t], l$B$B1[t]*(1-x$db1), sum(l$G$G1[[t]]))
+  l$Q$Q2[t] <- getQty(x$Y, l$p$p2[t], l$B$B2[t]*(1-x$db2), sum(l$G$G2[[t]]))
   ## Platform Operator Profit
-  l$Pi$Pi1 <- getPi(x$r,x$d1,x$psi1,x$rho,x$c1,l$Q$Q1[1], l$O$O1[1], x$Y)
-  l$Pi$Pi2 <- getPi(x$r,x$d2,x$psi2,x$rho,x$c2,l$Q$Q2[1], l$O$O2[1], x$Y)
+  l$Pi$Pi1 <- getPi(x$r,x$d1,x$psi1,x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
+  l$Pi$Pi2 <- getPi(x$r,x$d2,x$psi2,x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
 }
 
 
