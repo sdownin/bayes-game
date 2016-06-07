@@ -542,11 +542,13 @@ getModelstring <- function(sig1,sig2)
 
 getQhatMcmc <- function(data, modelstring, variables=c('q'), n.chains=2, n.adapt=3000,n.iter.update=3000, n.iter.samples=3000, thin=3, seed=1111)
 {
-  cat('Starting MCMC . . . ')
+  cat('Starting MCMC . . . \n')
   set.seed(1111)
   model <- jags.model(textConnection(modelstring),
                       data=data,n.adapt=n.adapt,n.chains=n.chains )
+  ## BURN IN ITERATIONS TO APPROACH STATIONARY DISTRIBUTION
   update(model, n.iter=n.iter.update)
+  ## ADAPTIVE SAMPLES FROM STATIONARY DISTRIBUTION TO SIMULATE POSTERIOR 
   output <- coda.samples(model=model, variable.names=variables,n.iter=n.iter.samples, thin=thin)
   return(output)
 }
@@ -605,14 +607,16 @@ getSigmaStar <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1, qhat)
 getQstarSig21(1.5,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,4000)
 
 lo <- 100
-omegavec <- seq(.01,10,length.out = lo)
+omegavec <- seq(.01,2.5,length.out = lo)
 rhovec <- seq(.01,2.5,length.out = lo)
 rvec <- seq(.001,.99, length.out = lo)
 cvec <- seq(.01,.99, length.out = lo)
 wvec <- seq(.01,.99, length.out = lo)
 pvec <- seq(1,1000,length.out = lo)
 jvec <- seq(10,10000,length.out = lo)
-bvec <- seq(10,10000,length.out = lo)
+bvec <- seq(10,1000,length.out = lo)
+gammavec <- seq(.001,.999,length.out = lo)
+
 png('qstar_sig2_0.png',height=7,width=7,units='in',res=250)
   par(mfrow=c(3,3),mar=c(4,4.5,2,1))
   x <- omegavec; plot(x,getQstarSig20(x,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,4000),type='o',pch=16,xlab=expression(omega),ylab=expression(q^star));abline(h=c(0,1))
@@ -640,44 +644,46 @@ png('qstar_sig2_1.png',height=7,width=7,units='in',res=250)
 dev.off()
 
 png('qstar_sig2_0_sig2_1_compare_matplot1.png',height=8,width=9,units='in',res=250)
-  par(mfrow=c(3,3),mar=c(4,4.5,2,1))
+  par(mfrow=c(3,3),mar=c(2.3,4.5,4,1))
   x <- omegavec; df.x <- data.frame(
     sig20=getQstarSig20(x,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,4000),
     sig21=getQstarSig21(x,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,4000)
-  ); matplot(x,df.x,type='l',xlab=expression(omega),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
+  ); matplot(x,df.x,type='l',main=expression(omega),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
   x <- rhovec; df.x <- data.frame(
     sig20=getQstarSig20(1.5,x,.1,.5,.05,1,2,100,100,400,600,100,.1,4000),
     sig21=getQstarSig21(1.5,x,.1,.5,.05,1,2,100,100,400,600,100,.1,4000)
-  ); matplot(x,df.x,type='l',xlab=expression(tilde(rho)),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
+  ); matplot(x,df.x,type='l',main=expression(tilde(rho)),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
   x <- rvec; df.x <- data.frame(
     sig20=getQstarSig20(1.5,1.05,x,.5,.05,1,2,100,100,400,600,100,.1,4000),
     sig21=getQstarSig21(1.5,1.05,x,.5,.05,1,2,100,100,400,600,100,.1,4000)
-  ); matplot(x,df.x,type='l',xlab=expression(r[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
+  ); matplot(x,df.x,type='l',main=expression(r[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
   x <- cvec; df.x <- data.frame(
     sig20=getQstarSig20(1.5,1.05,.1,x,.05,1,2,100,100,400,600,100,.1,4000),
     sig21=getQstarSig21(1.5,1.05,.1,x,.05,1,2,100,100,400,600,100,.1,4000)
-  ); matplot(x,df.x,type='l',xlab=expression(c[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
+  ); matplot(x,df.x,type='l',main=expression(c[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
   x <- wvec; df.x <- data.frame(
     sig20=getQstarSig20(1.5,1.05,.1,.5,x,1,2,100,100,400,600,100,.1,4000),
     sig21=getQstarSig21(1.5,1.05,.1,.5,x,1,2,100,100,400,600,100,.1,4000)
-  ); matplot(x,df.x,type='l',xlab=expression(w[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
+  ); matplot(x,df.x,type='l',main=expression(w[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
+  x <- gammavec; df.x <- data.frame(
+    sig20=getQstarSig20(1.5,1.05,.1,.5,.05,1,2,100,100,400,600,100,x,4000),
+    sig21=getQstarSig21(1.5,1.05,.1,.5,.05,1,2,100,100,400,600,100,x,4000)
+  ); matplot(x,df.x,type='l',main=expression(psi[1]==gamma[1]/(y*B[1]/p[1])),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
   x <- pvec; df.x <- data.frame(
     sig20=getQstarSig20(1.5,1.05,.1,.5,.05,1,2,x,100,400,600,100,.1,4000),
     sig21=getQstarSig21(1.5,1.05,.1,.5,.05,1,2,x,100,400,600,100,.1,4000)
-  ); matplot(x,df.x,type='l',xlab=expression(p[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
+  ); matplot(x/10,df.x,type='l',main=expression(p[1]/p[2]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
   x <- jvec; df.x <- data.frame(
     sig20=getQstarSig20(1.5,1.05,.1,.5,.05,1,2,100,100,x,600,100,.1,4000),
     sig21=getQstarSig21(1.5,1.05,.1,.5,.05,1,2,100,100,x,600,100,.1,4000)
-  ); matplot(x,df.x,type='l',xlab=expression(J[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
-  x <- jvec; df.x <- data.frame(
-    sig20=getQstarSig20(1.5,1.05,.1,.5,.05,1,2,100,100,400,x,100,.1,4000),
-    sig21=getQstarSig21(1.5,1.05,.1,.5,.05,1,2,100,100,400,x,100,.1,4000)
-  ); matplot(x,df.x,type='l',xlab=expression(J[2]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
+  ); matplot(x/(400+x),df.x,type='l',main=expression(tilde(J[1])==(J[1]/Sigma[k]*J[k])),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
   x <- bvec; df.x <- data.frame(
     sig20=getQstarSig20(1.5,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,x),
     sig21=getQstarSig21(1.5,1.05,.1,.5,.05,1,2,100,100,400,600,100,.1,x)
-  ); matplot(x,df.x,type='l',xlab=expression(B[1]),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c('sigma2=0','sigma2=1'),col=1:2,lty=1:2)
+  ); matplot(x/1000,df.x,type='l',main=expression(B[1]/(Sigma[k]*J[k])),ylab=expression(q^'*'));abline(h=c(0,1));legend('topright',legend=c(expression(sigma[2]==0),expression(sigma[2]==1)),col=1:2,lty=1:2)
 dev.off()
+
+
 
 #-----------------------------------------------
 

@@ -18,8 +18,8 @@ setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differe
 share.list <- function(x,k=1) 
 {
   out <- sapply(x$z, function(z){
-    th1 <- x$p2 * (x$v1 + x$w * x$sig1 * z)
-    th2 <- x$p1 * (x$v2 + x$w * x$sig2 * z)
+    th1 <- x$p2 * (x$v1 + x$omega * x$sig1 * z)
+    th2 <- x$p1 * (x$v2 + x$omega * x$sig2 * z)
     if(k==1) {
       num <- (th1/th2) * x$J1^x$rho
       denom <- (th1/th2) * x$J1^x$rho  + x$J2^x$rho
@@ -222,7 +222,7 @@ getModelstring <- function(sig1,sig2)
          s[i] <- ",ifelse(sig2 > sig1,
                           "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
                           "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
-  ),"
+         ),"
       G[i] ~ dbinom(s[i],L)
 }
 q ~ dbeta(h1t,h2t)
@@ -235,11 +235,13 @@ q ~ dbeta(h1t,h2t)
 ##
 getQhatMcmc <- function(data, modelstring, variables=c('q'), n.chains=2, n.adapt=3000,n.iter.update=3000, n.iter.samples=3000, thin=3, seed=1111)
 {
-  cat('Starting MCMC . . . ')
+  cat('Starting MCMC . . . \n')
   set.seed(1111)
   model <- jags.model(textConnection(modelstring),
                       data=data,n.adapt=n.adapt,n.chains=n.chains )
+  ## BURN IN ITERATIONS TO APPROACH STATIONARY DISTRIBUTION
   update(model, n.iter=n.iter.update)
+  ## ADAPTIVE SAMPLES FROM STATIONARY DISTRIBUTION TO SIMULATE POSTERIOR 
   output <- coda.samples(model=model, variable.names=variables,n.iter=n.iter.samples, thin=thin)
   return(output)
 }
@@ -262,8 +264,66 @@ getQhatEst <- function(mcmc.output, probs, burninProportion=.2)
 #
 #
 ##
-getQstarSig20 <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
+plotMCMCdiagnostics <- function(output,t,param='q')
 {
+  n.chains <- length(output)
+  par(mfrow=c(2,2),mar=c(4,3,2,2))
+  mcmcplots::denplot(output,style = 'plain',auto.layout = F,main=sprintf("Density of %s (t=%s)",param,t))
+  mcmcplots::traplot(output,style = 'plain',auto.layout = F,main=sprintf("Trace of %s (t=%s)",param,t))
+  mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main=sprintf("Thinned Running Mean of %s (t=%s)",param,t))
+  mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main=sprintf("Autocorrelation of %s (t=%s)",param,t))
+}
+
+##
+#
+#
+##
+getNaiveMCMCseMean <- function(mcmc.output)
+{
+  su <- summary(mcmc.output)
+  mu <- su$statistics['Mean']
+  t.stat <- unname(mu/su$statistics['SD'])
+  p.val <- pt(q = t.stat, lower.tail = F, df = su$end-su$start-1)
+  return(print(sprintf('MCMC mean point estimate = %.4f (p-val = %.4f)',mu,p.val)))
+}
+
+##
+#
+#
+##
+getNIterRafDiag <- function(mcmc.samp.output, q=0.025, r=0.005, s=0.95)
+{
+  raf.test <- try(
+    raftery.diag(c(mcmc.samp.output), q=q, r=r, s=s), 
+    silent=T
+  )
+  if (inherits(raf.test, 'try-error'))
+    stop(sprintf('the error level r=%s is too high. Try again with smaller r.',r))
+  nmin <- as.numeric(raf.test$resmatrix[2])
+  cat(sprintf('Raftery & Lewis N_min interations = %s',nmin))
+  return(nmin)
+}
+
+##
+#
+#
+##
+getHeidConvDiag <- function(mcmc.output, eps=0.1, pvalue=0.05)
+{
+  cat('\nHeidelberg-Welch diagnostic:\n')
+  h <- heidel.diag(mcmc.output, eps=eps, pvalue=pvalue)
+  print(h)
+  return(all(sapply(h, function(x)x[1,c('stest','htest')]==1)))
+}
+
+##
+#
+#
+##
+getQstarSig20 <- function(x,p1,p2,J1,J2,B1)
+{
+  omega <- x$omega; rho <- x$rho; r1 <- x$r1; c1 <- x$c1; w1 <- x$w1; v1 <- x$v1; v2 <- x$v2; 
+  gamma1 <- x$gamma1; y <- x$Y
   Qty <- (y/p1) * B1
   psi1 <- gamma1 / Qty
   num <- psi1*v1*( p2*(v1+omega)*J1^rho  + p1*v2*J2^rho )
@@ -275,8 +335,10 @@ getQstarSig20 <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
 #
 #
 ##
-getQstarSig21 <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
+getQstarSig21 <- function(x,p1,p2,J1,J2,B1)
 {
+  omega <- x$omega; rho <- x$rho; r1 <- x$r1; c1 <- x$c1; w1 <- x$w1; v1 <- x$v1; v2 <- x$v2; 
+  gamma1 <- x$gamma1; y <- x$Y
   psi1 <- gamma1 / ((y/p1)*B1)
   num <- (psi1*v1*p2*J1^rho)/(v1*p2*J1^rho + v2*p1*J2^rho)
   den.a <- ((r1*rho*c1-(w1+psi1))*(v1+omega)*p2*J1^rho)/((v1+omega)*p2*J1^rho + v2*p1*J2^rho)
@@ -311,16 +373,18 @@ getSigmaStar <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1, qhat)
 }
 
 ##
-#
+# Main Function to Play CSR Bayes game
+#   with MCMC Gibbs sampling to `learn` distribution of hedonic buyers (q)
 # @param x [list] all game parameters
 # @returns [list] game outcomes per variable and MCMC samples
 ##
 playCsrBayesGame <- function(x)
 {
-  
+  x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
   ## allocate game array
   l <- list(
-    M=rep(0,x$Tau)
+    q.true=x$q
+    , M=rep(0,x$Tau)
     , qhat=list(mcmc=list(),
                 est=data.frame(L99=rep(0,x$Tau),L95=rep(0,x$Tau),
                                mu=rep(0,x$Tau),
@@ -376,18 +440,18 @@ playCsrBayesGame <- function(x)
                     x$v1, x$v2,
                     l$sig$sig1[t], l$sig$sig2[t],
                     l$J$J1[t], l$J$J2[t],
-                    x$w, l$z[[t]],
+                    x$omega, l$z[[t]],
                     x$rho, k=1)
   l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
   l$G$G2[[t]] <- getG( 1-l$s[[t]], l$L$L2[t], l$M[t])
   
   ## Qstar THRESHOLD
-  # qstar1.0 <- getQstarSig20(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t])
-  # qstar1.1 <- getQstarSig21(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t])
-  # qstar2.0 <- getQstarSig20(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t])
-  # qstar2.1 <- getQstarSig21(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t])
-  # l$qstar$qstar1[t] <- getSigmaStar(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t], l$qhat$est$mu[t]) ## ??????????????????
-  # l$qstar$qstar2[t] <- getSigmaStar(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t], l$qhat$est$mu[t]) ## ??????????????????
+  # qstar1.0 <- getQstarSig20(x$omega,x$rho,x$r1,x$c1,x$w1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t])
+  # qstar1.1 <- getQstarSig21(x$omega,x$rho,x$r1,x$c1,x$w1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t])
+  # qstar2.0 <- getQstarSig20(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t])
+  # qstar2.1 <- getQstarSig21(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t])
+  # l$qstar$qstar1[t] <- getSigmaStar(x$omega,x$rho,x$r1,x$c1,x$w1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t], l$qhat$est$mu[t]) ## ??????????????????
+  # l$qstar$qstar2[t] <- getSigmaStar(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t], l$qhat$est$mu[t]) ## ??????????????????
   
   ## LEARN Qhat
   data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
@@ -395,7 +459,7 @@ playCsrBayesGame <- function(x)
                sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
                J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
                v1=x$v1,v2=x$v2,
-               w=ifelse(l$qhat$est$mu[t]>0, x$w, 0),    ## ensure no signal when q=0
+               w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
                rho=x$rho,
                h1t=x$a1 + l$h$h1[t], h2t=x$a2 + l$h$h2[t])
   modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
@@ -403,6 +467,10 @@ playCsrBayesGame <- function(x)
                                    n.chains=3, n.adapt=300,n.iter.update=300, 
                                    n.iter.samples=300, thin=3, seed=1111)
   l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
+  
+  ## CHECK N_MIN  ITERATIONS WITH RAFTERY & LEWIS DIAGNOSTIC 
+  ## ERROR:  +/- 1%
+  x$n.iter <- getNIterRafDiag(l$qhat$mcmc[[t]], q = .025, r=.01, s=0.95)
   
   ## TEST LEARNING VIA AUTOCORRELATION
   # l$h$h1[t] <- x$ep * ( sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
@@ -418,8 +486,8 @@ playCsrBayesGame <- function(x)
   ## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
   if(x$downweight) {
     ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
-    l$h$h1[t] <- x$a1 + sum(l$z[[t]])/mean(unlist(ac$statistic))
-    l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /mean(unlist(ac$statistic))
+    l$h$h1[t] <- x$a1 + sum(l$z[[t]])/log(mean(unlist(ac$statistic)))
+    l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /log(mean(unlist(ac$statistic)))
   } else {
     l$h$h1[t] <- x$a1 + sum(l$z[[t]])
     l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) )
@@ -431,8 +499,8 @@ playCsrBayesGame <- function(x)
   l$Q$Q1[t] <- getQty(x$Y, l$p$p1[t], l$B$B1[t]*(1-x$db1), sum(l$G$G1[[t]]))
   l$Q$Q2[t] <- getQty(x$Y, l$p$p2[t], l$B$B2[t]*(1-x$db2), sum(l$G$G2[[t]]))
   ## Platform Operator Profit
-  l$Pi$Pi1[t] <- getPi(x$r1,x$d1,l$psi$psi1[t],x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
-  l$Pi$Pi2[t] <- getPi(x$r2,x$d2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
+  l$Pi$Pi1[t] <- getPi(x$r1,x$w1,l$psi$psi1[t],x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
+  l$Pi$Pi2[t] <- getPi(x$r2,x$w2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
   
   
   
@@ -442,20 +510,30 @@ playCsrBayesGame <- function(x)
   for (t in 2:x$Tau)
   {
     cat(paste0('\nt: ',t,'\n'))
+    
     ## STRATEGY DECISION VARIABLES
-    # l$qstar$qstar1[t] <- getSigmaStar(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma1,l$B$B1[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
-    # l$qstar$qstar2[t] <- getSigmaStar(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
+    # l$qstar$qstar1[t] <- getSigmaStar(x$omega,x$rho,x$r1,x$c1,x$w1,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma1,l$B$B1[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
+    # l$qstar$qstar2[t] <- getSigmaStar(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
     l$qstar$qstar1[t] <-  ifelse(l$sig$sig2[t]==0,
-                                 getQstarSig20(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma1,l$B$B1[t-1]),
-                                 getQstarSig21(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma1,l$B$B1[t-1])
+                                 getQstarSig20(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B1[t-1]),
+                                 getQstarSig21(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B1[t-1])
     )
     l$qstar$qstar2[t] <- ifelse(l$sig$sig2[t]==1,
-                                getQstarSig20(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1]),
-                                getQstarSig21(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1])
+                                getQstarSig20(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B2[t-1]),
+                                getQstarSig21(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B2[t-1])
     )
-    l$sig$sig1[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
-    l$sig$sig2[t] <- 0               ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+    ## CSR STRATEGIES
+    if(!is.na(x$sig1.fixed)) ## FIXED STRATEGY 
+      l$sig$sig1[t] <- ifelse(!is.na(x$sig1.fixed[t]), x$sig1.fixed[t],  l$sig$sig1[t-1])
+    else                     ## BAYES LEARNED STRATEGY
+      l$sig$sig1[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+
+    if(!is.na(x$sig2.fixed)) ## FIXED STRATEGY 
+      l$sig$sig2[t] <- ifelse(!is.na(x$sig2.fixed[t]), x$sig2.fixed[t],  l$sig$sig2[t-1])
+    else                     ## BAYES LEARNED STRATEGY
+      l$sig$sig2[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
     
+
     ## CSR CONTINGENT COSTS
     l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1, x$gamma1, 0)
     l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
@@ -487,7 +565,7 @@ playCsrBayesGame <- function(x)
                       x$v1, x$v2,
                       l$sig$sig1[t], l$sig$sig2[t],
                       l$J$J1[t], l$J$J2[t],
-                      x$w, l$z[[t]],
+                      x$omega, l$z[[t]],
                       x$rho, k=1)
     l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
     l$G$G2[[t]] <- getG(1-l$s[[t]], l$L$L2[t], l$M[t])
@@ -499,7 +577,7 @@ playCsrBayesGame <- function(x)
                  sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
                  J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
                  v1=x$v1,v2=x$v2,
-                 w=ifelse(l$qhat$est$mu[t]>0, x$w, 0),    ## ensure no signal when q=0
+                 w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
                  rho=x$rho,
                  h1t=x$a1 + l$h$h1[t-1], h2t=x$a2 + l$h$h2[t-1])
     modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
@@ -508,8 +586,13 @@ playCsrBayesGame <- function(x)
                                     n.iter.samples=x$n.iter, thin=3, seed=1111)
     l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
     
-    ## PLOTS MCMC DIAGNOSTICS
-    plotMCMCdiagnostics(l$qhat$mcmc[[t]])
+    ## MCMC SAMPLE MEAN
+    getNaiveMCMCseMean(l$qhat$mcmc[[t]])    
+    
+    ## MCMC DIAGNOSTICS
+    getHeidConvDiag(l$qhat$mcmc[[t]])
+    gelman.plot(l$qhat$mcmc[[t]], main=sprintf('\n\niteration: %s',t))
+    plotMCMCdiagnostics(l$qhat$mcmc[[t]],t)
     
     ## TEST LEARNING VIA AUTOCORRELATION
     ## IF STRATEGIES ARE  THE SAME, AUTOCORRELATION SHOULD BE SIGNIFICANT --> DON'T COUNT THIS PERIOD z SAMPLE
@@ -525,8 +608,8 @@ playCsrBayesGame <- function(x)
     ## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
     if(x$downweight) {
       ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
-      l$h$h1[t] <- l$h$h1[t-1] + sum(l$z[[t]])/mean(unlist(ac$statistic))
-      l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /mean(unlist(ac$statistic))
+      l$h$h1[t] <- l$h$h1[t-1] + sum(l$z[[t]])/log(mean(unlist(ac$statistic)))
+      l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /log(mean(unlist(ac$statistic)))
     } else {
       l$h$h1[t] <- l$h$h1[t-1] + sum(l$z[[t]])
       l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) 
@@ -537,9 +620,25 @@ playCsrBayesGame <- function(x)
     l$Q$Q1[t] <- getQty(x$Y, l$p$p1[t], l$B$B1[t]*(1-x$db1), sum(l$G$G1[[t]]))
     l$Q$Q2[t] <- getQty(x$Y, l$p$p2[t], l$B$B2[t]*(1-x$db2), sum(l$G$G2[[t]]))
     ## Platform Operator Profit
-    l$Pi$Pi1[t] <- getPi(x$r1,x$d1,l$psi$psi1[t],x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
-    l$Pi$Pi2[t] <- getPi(x$r2,x$d2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
+    l$Pi$Pi1[t] <- getPi(x$r1,x$w1,l$psi$psi1[t],x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
+    l$Pi$Pi2[t] <- getPi(x$r2,x$w2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
   }
   #--------------------------------- END MAIN GAME LOOP ------------------------------------------------
   return(l)
 }
+
+##
+#
+#
+##
+csrBayesGameSummaryPlots <- function(x,l)
+{
+  par(mfrow=c(3,2),mar=c(4,2.5,4,1))
+  matplot(l$J/rowSums(l$J),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(J)));abline(v=c(x$t1.change,x$t2.change),lty=2)
+  matplot(l$B/rowSums(l$B),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(B)));legend('topright',legend=1:2,col=1:2,lty=1:2,pch=16);abline(v=c(x$t1.change,x$t2.change),lty=2)
+  matplot(l$Q/rowSums(l$Q),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(Qty)));abline(v=c(x$t1.change,x$t2.change),lty=2)
+  matplot(l$Pi,            xlab=('Game Period (t)'),            type='o',pch=16,main=expression(pi));abline(h=0,col='black');abline(v=c(x$t1.change,x$t2.change),lty=2)
+  matplot(l$h/rowSums(l$h),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(h)==Sigma[i]*z[i]),col=c('steelblue','darkgreen'))
+  matplot(l$qhat$est,      xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=c(NA,NA,16,NA,NA),main=expression(hat(q)),lty=c(3,2,1,2,3),lwd=c(1,1,2,1,1),col=c('black','black','steelblue','black','black'));abline(h=x$q,col='black')
+}
+

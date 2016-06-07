@@ -1,3 +1,7 @@
+##
+#
+#
+##
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 source(file.path(getwd(),'csr_bayes_game_functions.R'))
 
@@ -449,8 +453,44 @@ dev.off()
 #   BEGIN CSR BAYES GAME
 #
 #-----------------------------------------------
-x <- list(
-  v1=1
+# x <- list(
+#   v1=1
+#   , v2=1
+#   , db1=.3  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+#   , db2=.3  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+#   , dj1=.05
+#   , dj2=.05
+#   , c1=.5       ## seller MARGINAL cost
+#   , c2=.5       ## seller MARGINAL cost
+#   , gamma1=.05  ## seller CSR cost
+#   , gamma2=.05  ## seller CSR cost
+#   , d1=.01      ## Platform operator MARGINAL cost
+#   , d2=.01      ## Platform operator MARGINAL cost
+#   , psi1=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
+#   , psi2=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
+#   , a1=1
+#   , a2=1
+#   , r1=.1
+#   , r2=.1
+#   , w=1.5
+#   , rho=.7
+#   , growth=.01
+#   , Y=1000
+#   , ep=1e-1
+#   , N0=500
+#   , Tau=10
+#   , probs=c(.005,.025,.5,.975,.995)
+#   , learningThreshold=.05
+#   , n.iter=1000
+#   , downweight=FALSE
+#   , q=.3
+# )
+
+##  RUN MAIN GAME SIMULATION
+##  USING GAME SETUP LIST X
+# l <- playCsrBayesGame(x)
+l1 <- playCsrBayesGame(list(
+    v1=1
   , v2=1
   , db1=.3  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
   , db2=.3  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
@@ -468,39 +508,34 @@ x <- list(
   , a2=1
   , r1=.1
   , r2=.1
-  , w=1.5
+  , w=10
   , rho=.7
   , growth=.01
   , Y=1000
   , ep=1e-1
   , N0=500
-  , Tau=10
+  , Tau=8
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
-  , n.iter=1000
+  , n.iter=600
   , downweight=FALSE
-  , q=.3
-)
-x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
+  , q=.9
+))
 
-##  RUN MAIN GAME SIMULATION
-##  USING GAME SETUP LIST X
-l <- playCsrBayesGame(x)
-  
-print(l$sig)
-matplot(l$J,type='l')
-matplot(l$B/rowSums(l$B),type='l')
-matplot(l$Q/rowSums(l$Q),type='l')
-matplot(l$Pi/rowSums(l$Pi),type='l')
-matplot(l$qhat$est,type='l',ylim=c(0,1))
+print(l1$sig)
+matplot(l1$J,type='l',main='J')
+matplot(l1$B/rowSums(l1$B),type='l',main=expression(tilde(B)))
+matplot(l1$Q/rowSums(l1$Q),type='l',main=expression(tilde(Qty)))
+matplot(l1$Pi/rowSums(l1$Pi),type='l',main=expression(tilde(pi)))
+matplot(l1$qhat$est,type='l',ylim=c(0,1),main=expression(hat(q)))
 
-t <- seq_len(nrow(l$qhat$est))
-g <- ggplot(aes(y=mu),data=l$qhat$est) + 
+t <- seq_len(nrow(l1$qhat$est))
+g <- ggplot(aes(y=mu),data=l1$qhat$est) + 
   geom_point(aes(x=t,y=mu),size=2.5)+ 
   geom_line(aes(x=t,y=mu), lwd=1.1) + 
   geom_ribbon(aes(x=t,ymin=L95,ymax=U95),alpha=.20) +
   geom_ribbon(aes(x=t,ymin=L99,ymax=U99),alpha=.12) + 
-  geom_hline(yintercept=x$q, col='red', lty=2) +
+  geom_hline(yintercept=l$q.true, col='red', lty=2) +
   ylab('q') + ylim(0,1) +
   theme_bw()
 g
