@@ -512,7 +512,16 @@ getPi <- function(r,w,psi,rho,c,Q,O,y)
   netMargProfit <-  r - ( (w+psi)/(rho*c) )
   return( netMargProfit*Q - (O/y) )
 }
-
+muBeta <- function(a,b)
+{
+  return(a/(a+b))
+}
+varBeta <- function(a,b)
+{
+  num <- a*b
+  denom <- (a+b)^2 * (a+b+1)
+  return(num/denom)
+}
 
 getModelstring <- function(sig1,sig2)
 {
@@ -672,6 +681,12 @@ dev.off()
 
 #-----------------------------------------------
 
+
+#-----------------------------------------------
+#
+#   BEGIN CSR BAYES GAME
+#
+#-----------------------------------------------
 x <- list(
     v1=1
   , v2=1
@@ -697,12 +712,12 @@ x <- list(
   , Y=1000
   , ep=1e-1
   , N0=500
-  , Tau=6
+  , Tau=10
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
   , n.iter=1000
   , downweight=FALSE
-  , q=.7
+  , q=.3
 )
 x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
 
@@ -747,7 +762,7 @@ l$B$B1[t] <- 300
 l$B$B2[t] <- 700
 l$p$p1[t] <- 10
 l$p$p2[t] <- 10
-l$sig$sig1[t] <- 1
+l$sig$sig1[t] <- 0
 l$sig$sig2[t] <- 0
 l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1,x$gamma2, 0)
 l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
@@ -842,8 +857,8 @@ for (t in 2:x$Tau)
                               getQstarSig20(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1]),
                               getQstarSig21(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1])
                               )
-  l$sig$sig1[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
-  l$sig$sig2[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+  l$sig$sig1[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+  l$sig$sig2[t] <- 0               ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
   
   ## CSR CONTINGENT COSTS
   l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1, x$gamma1, 0)
@@ -937,6 +952,17 @@ matplot(l$B/rowSums(l$B),type='l')
 matplot(l$Q/rowSums(l$Q),type='l')
 matplot(l$Pi/rowSums(l$Pi),type='l')
 matplot(l$qhat$est,type='l',ylim=c(0,1))
+
+t <- seq_len(nrow(l$qhat$est))
+g <- ggplot(aes(y=mu),data=l$qhat$est) + 
+  geom_point(aes(x=t,y=mu),size=2.5)+ 
+  geom_line(aes(x=t,y=mu), lwd=1.1) + 
+  geom_ribbon(aes(x=t,ymin=L95,ymax=U95),alpha=.20) +
+  geom_ribbon(aes(x=t,ymin=L99,ymax=U99),alpha=.12) + 
+  geom_hline(yintercept=x$q, col='red', lty=2) +
+  ylab('q') + ylim(0,1) +
+  theme_bw()
+g
 
 # for (t in 1:x$Tau) {
 #   output <- l$qhat$mcmc[[t]]
