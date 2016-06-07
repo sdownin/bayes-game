@@ -696,9 +696,10 @@ x <- list(
   , Y=1000
   , ep=1e-3
   , N0=1000
-  , Tau=4
+  , Tau=10
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
+  , q=.3
 )
 x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
 
@@ -750,9 +751,11 @@ l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
 l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
 l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
 l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
-l$z[[t]] <- rbinom(length(l$z[[t]]), 1, l$qhat$est$mu[t])
+l$z[[t]] <- rbinom(length(l$z[[t]]), 1, x$q)  ##  CHANGING TO GROUND TRUE  q
 l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
 l$L$L2[t] <- ceiling(x$Y / l$p$p2[t])
+
+
 
 # LIST demand share
 l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
@@ -812,8 +815,9 @@ l$Pi$Pi2[t] <- getPi(x$r2,x$d2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$
 
 #---------------------------------- MAIN GAME LOOP ----------------------------------------------
 
-for (t in 2:Tau)
+for (t in 2:x$Tau)
 {
+  cat(paste0('t: ',t,'\n'))
   ## STRATEGY DECISION VARIABLES
   # l$qstar$qstar1[t] <- getSigmaStar(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma1,l$B$B1[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
   # l$qstar$qstar2[t] <- getSigmaStar(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
@@ -826,7 +830,7 @@ for (t in 2:Tau)
                               getQstarSig21(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1])
                               )
   l$sig$sig1[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
-  l$sig$sig2[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+  l$sig$sig2[t] <- 0##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
   
   ## CSR CONTINGENT COSTS
   l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1, x$gamma1, 0)
@@ -842,7 +846,8 @@ for (t in 2:Tau)
   l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
   l$L$L2[t] <- ceiling(x$Y / l$p$p2[t])
   ## PREVIOS PERIOD DEPENDENT UPDATES
-  l$M[t] <- 0 + x$db1*l$B$B1[t-1] + x$db2*l$B$B2[t-1]+ x$dj1*l$J$J1[t-1] + x$dj2*l$J$J2[t-1]
+  m.temp <- x$db1*l$B$B1[t-1] + x$db2*l$B$B2[t-1]+ x$dj1*l$J$J1[t-1] + x$dj2*l$J$J2[t-1] 
+  l$M[t] <- ifelse( m.temp <= length(l$z[[t]]), m.temp, length(l$z[[t]]) )
   l$J$J1[t] <- getJ(x$Y,x$rho,l$gamma$gamma1[t],x$c1,l$B$B1[t-1],l$f$f1[t],l$J$J1[t-1],x$dj1) 
   l$J$J2[t] <- getJ(x$Y,x$rho,l$gamma$gamma2[t],x$c2,l$B$B2[t-1],l$f$f2[t],l$J$J2[t-1],x$dj2)
   s1.avg <- sum(l$G$G1[[t-1]]) / (length(l$G$G1[[t-1]])*l$L$L1[t])
@@ -851,7 +856,7 @@ for (t in 2:Tau)
   l$B$B1[t] <- getB(s2.avg, l$M[[t]], l$B$B1[t], x$db1) 
   
   # SAMPLE MARKET ATTITUDES
-  l$z[[t]] <- rbinom(length(l$z[[t]]),1,l$qhat$est$mu[t-1])
+  l$z[[t]] <- rbinom(length(l$z[[t]]),1, x$q)
   
   # LIST demand share
   l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
@@ -864,7 +869,7 @@ for (t in 2:Tau)
   l$G$G2[[t]] <- getG(1-l$s[[t]], l$L$L2[t], l$M[t])
   
   ## LEARN Qhat
-  data <- list(G=l$G$G1[t],  L=l$L$L1[t], 
+  data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
                n=round(l$M[t]),  ## NO Z HERE
                sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
                J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
@@ -899,9 +904,21 @@ for (t in 2:Tau)
 }
 #---------------------------------------------------------------------------------
 
+print(l$sig)
+matplot(l$qhat$est,type='l')
 
-
-
+for (t in 1:x$Tau) {
+  output <- l$qhat$mcmc[[t]]
+  n.chains <- length(l$qhat$mcmc[[t]])
+# fig.name <- paste0('mcmc_diagnostics_obs_q_',q,'_w_',w,'_sig1_',sig1,'_sig2_',sig2,'_t_',t,'.png')
+  # png(fig.name,height=6,width = 8, units = 'in', res = 250)
+  par(mfrow=c(2,2),mar=c(4,3,2,2))
+  mcmcplots::denplot(output,style = 'plain',auto.layout = F,main="Density of q")
+  mcmcplots::traplot(output,style = 'plain',auto.layout = F,main="Trace of q")
+  mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main="Thinned Running Mean of q")
+  mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main="Autocorrelation of q")
+# dev.off()
+}
 
 
 
