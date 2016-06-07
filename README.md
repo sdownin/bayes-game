@@ -5,4 +5,4 @@ The CSR - CSR Link in Platform Competition
 
 Dowing, S., and Kang, J.S. (2016)
 
-This mini-repo code for the manuscript to be submitted to Management Science.
+This mini-repo contains code for the manuscript to be submitted to Management Science.
