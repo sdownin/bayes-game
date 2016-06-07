@@ -674,8 +674,8 @@ dev.off()
 x <- list(
     v1=1
   , v2=1
-  , db1=.7  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-  , db2=.7  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db1=.3  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db2=.3  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
   , dj1=.05
   , dj2=.05
   , c1=.5       ## seller MARGINAL cost
@@ -686,7 +686,7 @@ x <- list(
   , d2=.01      ## Platform operator MARGINAL cost
   , psi1=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
   , psi2=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
-  , a1=.5
+  , a1=1
   , a2=1
   , r1=.1
   , r2=.1
@@ -694,9 +694,9 @@ x <- list(
   , rho=.7
   , growth=.01
   , Y=1000
-  , ep=1e-3
+  , ep=1e-1
   , N0=1000
-  , Tau=10
+  , Tau=5
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
   , q=.3
@@ -817,7 +817,7 @@ l$Pi$Pi2[t] <- getPi(x$r2,x$d2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$
 
 for (t in 2:x$Tau)
 {
-  cat(paste0('t: ',t,'\n'))
+  cat(paste0('\nt: ',t,'\n'))
   ## STRATEGY DECISION VARIABLES
   # l$qstar$qstar1[t] <- getSigmaStar(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma1,l$B$B1[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
   # l$qstar$qstar2[t] <- getSigmaStar(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
@@ -853,7 +853,7 @@ for (t in 2:x$Tau)
   s1.avg <- sum(l$G$G1[[t-1]]) / (length(l$G$G1[[t-1]])*l$L$L1[t])
   s2.avg <- sum(l$G$G2[[t-1]]) / (length(l$G$G2[[t-1]])*l$L$L2[t])
   l$B$B1[t] <- getB(s1.avg, l$M[[t]], l$B$B1[t], x$db1)         
-  l$B$B1[t] <- getB(s2.avg, l$M[[t]], l$B$B1[t], x$db1) 
+  l$B$B2[t] <- getB(s2.avg, l$M[[t]], l$B$B1[t], x$db1) 
   
   # SAMPLE MARKET ATTITUDES
   l$z[[t]] <- rbinom(length(l$z[[t]]),1, x$q)
@@ -868,6 +868,7 @@ for (t in 2:x$Tau)
   l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
   l$G$G2[[t]] <- getG(1-l$s[[t]], l$L$L2[t], l$M[t])
   
+  
   ## LEARN Qhat
   data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
                n=round(l$M[t]),  ## NO Z HERE
@@ -879,8 +880,8 @@ for (t in 2:x$Tau)
                h1t=x$a1 + l$h$h1[t-1], h2t=x$a2 + l$h$h2[t-1])
   modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
   l$qhat$mcmc[[t]] <- getQhatMcmc(data, modelstring, variable=c('q'), 
-                                n.chains=3, n.adapt=300,n.iter.update=300, 
-                                n.iter.samples=300, thin=3, seed=1111)
+                                n.chains=3, n.adapt=2000,n.iter.update=2000, 
+                                n.iter.samples=2000, thin=2, seed=1111)
   l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
   
   ## TEST LEARNING VIA AUTOCORRELATION
@@ -906,6 +907,8 @@ for (t in 2:x$Tau)
 
 print(l$sig)
 matplot(l$qhat$est,type='l')
+matplot(l$J,type='l')
+matplot(l$B/rowSums(l$B),type='l')
 
 for (t in 1:x$Tau) {
   output <- l$qhat$mcmc[[t]]
