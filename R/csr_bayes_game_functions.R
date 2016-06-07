@@ -408,8 +408,8 @@ playCsrBayesGame <- function(x, learn=TRUE)
     , sig=data.frame(sig1=rep(0,x$Tau), sig2=rep(0,x$Tau))
     , Q=data.frame(Q1=rep(0,x$Tau),Q2=rep(0,x$Tau))
     , Pi=data.frame(Pi1=rep(0,x$Tau),Pi2=rep(0,x$Tau))
-    , z=getGrowingVector(x$N0,x$Tau,x$growth)
-    , s=getGrowingVector(x$N0,x$Tau,x$growth)
+    , z=list()  ##getGrowingVector(x$N0,x$Tau,x$growth)
+    , s=list()  ##getGrowingVector(x$N0,x$Tau,x$growth)
     , G=list(G1=list(),G2=list())
   )
   
@@ -423,10 +423,10 @@ playCsrBayesGame <- function(x, learn=TRUE)
   l$qstar$qstar2[1] <- .5 ## ??????????????????
   
   ## Initial values
-  l$J$J1[t] <- 100
-  l$J$J2[t] <- 500
-  l$B$B1[t] <- 10000
-  l$B$B2[t] <- 50000
+  l$J$J1[t] <- 30
+  l$J$J2[t] <- 120
+  l$B$B1[t] <- 300
+  l$B$B2[t] <- 1200
   l$p$p1[t] <- 10
   l$p$p2[t] <- 10
   l$sig$sig1[t] <- 0
@@ -435,8 +435,8 @@ playCsrBayesGame <- function(x, learn=TRUE)
   l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
   l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
   l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
-  l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
-  l$z[[t]] <- rbinom(length(l$z[[t]]), 1, x$q)  ##  CHANGING TO GROUND TRUE  q
+  l$M[t] <- round(x$db1*l$B$B1[t] + x$db2*l$B$B2[t])
+  l$z[[t]] <- rbinom(l$M[t], 1, x$q)  ##  CHANGING TO GROUND TRUE  q
   l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
   l$L$L2[t] <- ceiling(x$Y / l$p$p2[t])
   
@@ -463,15 +463,15 @@ playCsrBayesGame <- function(x, learn=TRUE)
   ## LEARN Qhat
   if(learn) {
     data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
-                 n=round(l$M[t]),  ## NO Z HERE
+                 n=l$M[t]-1, ## WHY NEED TO DROP ONE OBS??             ## NOTE NO Z HERE (UNOBSERVED)
                  sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
                  J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
                  v1=x$v1,v2=x$v2,
                  w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
                  rho=x$rho,
                  h1t=x$a1 + l$h$h1[t], h2t=x$a2 + l$h$h2[t])
-    modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
-    l$qhat$mcmc[[t]]  <- getQhatMcmc(data, modelstring, variables=c('q'), 
+    modelstring1 <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
+    l$qhat$mcmc[[t]]  <- getQhatMcmc(data, modelstring1, variables=c('q'), 
                                      n.chains=3, n.adapt=100,n.iter.update=100, 
                                      n.iter.samples=100, thin=2, seed=1111)
     l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
@@ -533,15 +533,17 @@ playCsrBayesGame <- function(x, learn=TRUE)
                                 getQstarSig21(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B2[t-1])
     )
     ## CSR STRATEGIES
-    if(!is.na(x$sig1.fixed)) ## FIXED STRATEGY 
+    if(!is.na(x$sig1.fixed)) { ## FIXED STRATEGY 
       l$sig$sig1[t] <- ifelse(!is.na(x$sig1.fixed[t]), x$sig1.fixed[t],  l$sig$sig1[t-1])
-    else                     ## BAYES LEARNED STRATEGY
+    } else {                     ## BAYES LEARNED STRATEGY
       l$sig$sig1[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+    }
     
-    if(!is.na(x$sig2.fixed)) ## FIXED STRATEGY 
+    if(!is.na(x$sig2.fixed)) { ## FIXED STRATEGY 
       l$sig$sig2[t] <- ifelse(!is.na(x$sig2.fixed[t]), x$sig2.fixed[t],  l$sig$sig2[t-1])
-    else                     ## BAYES LEARNED STRATEGY
+    } else {                     ## BAYES LEARNED STRATEGY
       l$sig$sig2[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+    }
     
     ## UPDATE STRATEGY CHANGES
     if(l$sig$sig1[t] != l$sig$sig1[t-1] )
@@ -563,17 +565,17 @@ playCsrBayesGame <- function(x, learn=TRUE)
     l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
     l$L$L2[t] <- ceiling(x$Y / l$p$p2[t])
     ## PREVIOS PERIOD DEPENDENT UPDATES
-    m.temp <- x$db1*l$B$B1[t-1] + x$db2*l$B$B2[t-1]+ x$dj1*l$J$J1[t-1] + x$dj2*l$J$J2[t-1] 
-    l$M[t] <- ifelse( m.temp <= length(l$z[[t]]), m.temp, length(l$z[[t]]) )
+    m.temp <- round( x$db1*l$B$B1[t-1] + x$db2*l$B$B2[t-1] )
+    l$M[t] <- ifelse( m.temp <= 1, 1, m.temp)
     l$J$J1[t] <- getJ(x$Y,x$rho,l$gamma$gamma1[t],x$c1,l$B$B1[t-1],l$f$f1[t],l$J$J1[t-1],x$dj1) 
     l$J$J2[t] <- getJ(x$Y,x$rho,l$gamma$gamma2[t],x$c2,l$B$B2[t-1],l$f$f2[t],l$J$J2[t-1],x$dj2)
     s1.avg <- sum(l$G$G1[[t-1]]) / (length(l$G$G1[[t-1]])*l$L$L1[t])
     s2.avg <- sum(l$G$G2[[t-1]]) / (length(l$G$G2[[t-1]])*l$L$L2[t])
     l$B$B1[t] <- getB(s1.avg, l$M[[t]], l$B$B1[t-1], x$db1)         
-    l$B$B2[t] <- getB(s2.avg, l$M[[t]], l$B$B2[t-1], x$db1) 
+    l$B$B2[t] <- getB(s2.avg, l$M[[t]], l$B$B2[t-1], x$db2) 
     
     # SAMPLE MARKET ATTITUDES
-    l$z[[t]] <- rbinom(length(l$z[[t]]),1, x$q)
+    l$z[[t]] <- rbinom(l$M[t],1, x$q)
     
     # LIST demand share
     l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
@@ -589,15 +591,15 @@ playCsrBayesGame <- function(x, learn=TRUE)
     ## LEARN Qhat
     if(learn) {
       data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
-                   n=round(l$M[t]),  ## NO Z HERE
+                   n=l$M[t]-1,  ## NO Z HERE
                    sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
                    J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
                    v1=x$v1,v2=x$v2,
                    w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
                    rho=x$rho,
                    h1t=x$a1 + l$h$h1[t-1], h2t=x$a2 + l$h$h2[t-1])
-      modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
-      l$qhat$mcmc[[t]] <- getQhatMcmc(data, modelstring, variable=c('q'), 
+      modelstring1 <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
+      l$qhat$mcmc[[t]] <- getQhatMcmc(data, modelstring1, variable=c('q'), 
                                       n.chains=3, n.adapt=1000,n.iter.update=x$n.iter, 
                                       n.iter.samples=x$n.iter, thin=3, seed=1111)
       l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)

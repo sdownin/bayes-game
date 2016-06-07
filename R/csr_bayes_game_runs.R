@@ -43,8 +43,8 @@ source(file.path(getwd(),'R','csr_bayes_game_functions.R'))
 x <- list(
   v1= 1
   , v2=1
-  , db1=.2  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-  , db2=.2  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db1=.02  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db2=.02  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
   , dj1=.05
   , dj2=.05
   , c1=.5       ## seller MARGINAL cost
@@ -65,7 +65,7 @@ x <- list(
   , Y=1000
   , ep=1e-1
   , N0=500
-  , Tau=600
+  , Tau=10
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
   , n.iter=1000
@@ -79,12 +79,12 @@ x <- list(
 
 ## MAIN GAME CALL
 ## SET STRATEGY
-x$t1.change <- 20
-x$t2.change <- 200
+x$t1.change <- 2
+x$t2.change <- 4
 x$sig1.fixed <- c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change))
 x$sig2.fixed <- c(rep(0,x$t2.change),rep(0,x$Tau-x$t2.change))
 ## RUN
-l <- playCsrBayesGame(x, learn=FALSE)
+l <- playCsrBayesGame(x, learn=TRUE)
 ## OUTPUT
 print(l$sig)
 getCsrBayesGameSummaryPlots(x,l)
@@ -95,7 +95,7 @@ getCsrBayesGameSummaryPlots(x,l)
 file.title <- sprintf('csr_advantage_seller_pd_delay_q_%s_omeg_%s_rho_%s_w1_%s_c1_%s_downw_%s_db1_%s.png',
                       x$q,x$omega,x$rho,x$w1,x$c1,x$downweight,x$db1)
 png(file.path(getwd(),'img',file.title),height=8,width=6.5,units='in',res=250)
-  csrBayesGameSummaryPlots(x,l)
+csrBayesGameSummaryPlots(x,l)
 dev.off()
 
 
