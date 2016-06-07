@@ -512,10 +512,7 @@ getPi <- function(r,w,psi,rho,c,Q,O,y)
   netMargProfit <-  r - ( (w+psi)/(rho*c) )
   return( netMargProfit*Q - (O/y) )
 }
-getQstar <- function()
-{
-  
-}
+
 
 getModelstring <- function(sig1,sig2)
 {
@@ -572,6 +569,27 @@ getQstarSig21 <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
   den.b <- ((r1*rho*c1-w1)*v1*p2*J1^rho)/(v1*p2*J1^rho + (v2+omega)*p1*J2^rho)
   den.c <- (psi1*v1*p2*J1^rho)/(v1*p2*J1^rho + v2*p1*J2^rho)
   return(num/(den.a+den.b+den.c))
+}
+
+getSigmaStar <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1, qhat)
+{
+  ## FIND OPPONENT CUTOFF q
+  qstar2.if.sig1.0 <- getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
+  qstar2.if.sig1.1 <- getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
+  # FIND OPPONENT STRATEGY DECISION AS FUNTION OF OWN STRATEGY 
+  sig2.if.sig1.0 <- ifelse(qstar2.if.sig1.0 > qhat, 1, 0)
+  sig2.if.sig1.1 <- ifelse(qstar2.if.sig1.1 > qhat, 1, 0)
+  ## KNOWING WHAT THE OPPONENT WILL PLAY IF WE PLAY 0,  GET PROFITABLE STRATEGY COMPARED TO qhat
+  qstar1.of.sig2.if.sig1.0 <- ifelse(sig2.if.sig1.0==0,
+                                   getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1),
+                                   getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1))
+  sig1.of.sig2.if.sig1.0 <- ifelse(qstar1.of.sig2.if.sig1.0 > qhat, 1, 0)
+  ## KNOWING WHAT THE OPPONENT WILL PLAY IF WE PLAY 1,  GET PROFITABLE STRATEGY COMPARED TO qhat
+  qstar1.of.sig2.if.sig1.1 <- ifelse(sig2.if.sig1.1==0,
+                                   getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1),
+                                   getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1))
+  sig1.of.sig2.if.sig1.1 <- ifelse(qstar1.of.sig2.if.sig1.1 > qhat, 1, 0)
+  return()
 }
 
 #------------------------ CHECK BEHAVIOR OF QSTAR ------------------------------------
@@ -670,7 +688,8 @@ x <- list(
   #, psi2=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
   , a1=.5
   , a2=1
-  , r=.1
+  , r1=.1
+  , r2=.1
   , w=1
   , rho=.7
   , growth=.01
@@ -693,8 +712,8 @@ l <- list(
                              U95=rep(0,x$Tau),U99=rep(0,x$Tau)))
   , qstar=data.frame(qstar1=rep(0,x$Tau), qstart2=rep(0,x$Tau))
   , p=data.frame(p1=rep(10,x$Tau), p2=rep(10,x$Tau))
-  , gamma=data.frame(gamma1=rep(10,x$Tau), gamma2=rep(10,x$Tau))
-  , psi=data.frame(psi1=rep(10,x$Tau), psi2=rep(10,x$Tau))
+  , gamma=data.frame(gamma1=rep(0,x$Tau), gamma2=rep(0,x$Tau))
+  , psi=data.frame(psi1=rep(0,x$Tau), psi2=rep(0,x$Tau))
   , f=data.frame(f1=rep(1,x$Tau), f2=rep(1,x$Tau))
   , O=data.frame(O1=rep(1,x$Tau), O2=rep(1,x$Tau))
   , J=data.frame(J1=rep(0,x$Tau),J2=rep(0,x$Tau))
@@ -721,15 +740,15 @@ l$qstar$qstar2[1] <- .5 ## ??????????????????
 l$J$J1[t] <- 30
 l$J$J2[t] <- 70
 l$B$B1[t] <- 300
-l$B$B1[t] <- 700
+l$B$B2[t] <- 700
 l$p$p1[t] <- 10
 l$p$p2[t] <- 10
 l$sig$sig1[t] <- 1
 l$sig$sig2[t] <- 0
-l$gamma$gamma1[t] <- ifelse(l$sig$sig1==1,x$gamma2, 0)
-l$gamma$gamma2[t] <- ifelse(l$sig$sig2==1, x$gamma2, 0)
-l$psi$psi1[t] <- ifelse(l$sig$sig1==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
-l$psi$psi2[t] <- ifelse(l$sig$sig2==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
+l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1,x$gamma2, 0)
+l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
+l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
+l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
 l$M[t] <- 0 + x$db1*l$B$B1[t] + x$db2*l$B$B2[t]+ x$dj1*l$J$J1[t] + x$dj2*l$J$J2[t]
 l$z[[t]] <- rbinom(length(l$z[[t]]), 1, l$qhat$est$mu[t])
 l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
@@ -746,8 +765,12 @@ l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
 l$G$G2[[t]] <- getG( 1-l$s[[t]], l$L$L2[t], l$M[t])
 
 ## Qstar THRESHOLD
-l$qstar$qstar1[t] <- getQstar() ## ??????????????????
-l$qstar$qstar2[t] <- getQstar() ## ??????????????????
+qstar1.0 <- getQstarSig20(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t])
+qstar1.1 <- getQstarSig21(x$w,x$rho,x$r1,x$c1,x$d1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t])
+qstar2.0 <- getQstarSig20(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t])
+qstar2.1 <- getQstarSig21(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t])
+l$qstar$qstar1[t] <-  ## ??????????????????
+l$qstar$qstar2[t] <-  ## ??????????????????
 
 ## LEARN Qhat
 data <- list(G=l$G$G1[t],  L=l$L$L1[t], 
@@ -784,12 +807,18 @@ l$Q$Q2[t] <- getQty(x$Y, l$p$p2[t], l$B$B2[t]*(1-x$db2), sum(l$G$G2[[t]]))
 l$Pi$Pi1 <- getPi(x$r,x$d1,l$psi$psi1[t],x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
 l$Pi$Pi2 <- getPi(x$r,x$d2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
 
+
+
+
 #---------------------------------- MAIN GAME LOOP ----------------------------------------------
+
 for (t in 2:Tau)
 {
   ## STRATEGY DECISION VARIABLES
-  l$sig$sig1[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t-1], 1, 0)
-  l$sig$sig2[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t-1], 1, 0)
+  l$qstar$qstar1[t] <- getQstar()
+  l$qstar$qstar2[t] <- getQstar()
+  l$sig$sig1[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+  l$sig$sig2[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
   
   ## CSR CONTINGENT COSTS
   l$gamma$gamma1 <- ifelse(l$sig$sig1==1, x$gamma1, 0)
@@ -838,11 +867,6 @@ for (t in 2:Tau)
                                 n.chains=3, n.adapt=3000,n.iter.update=3000, 
                                 n.iter.sample=3000, thin=3, seed=1111)
   l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[t], probs=x$probs, burninProportion = .2)
-  
-  
-  l$qstar$qstar1[t] <- getQstar() ## ??????????????????
-  l$qstar$qstar2[t] <- getQstar() ## ??????????????????  
-  
   
   ## TEST LEARNING VIA AUTOCORRELATION
   ## IF STRATEGIES ARE  THE SAME, AUTOCORRELATION SHOULD BE SIGNIFICANT --> DON'T COUNT THIS PERIOD z SAMPLE
