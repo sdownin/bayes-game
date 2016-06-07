@@ -793,14 +793,18 @@ l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion 
 ## TEST LEARNING VIA AUTOCORRELATION
 # l$h$h1[t] <- x$ep * ( sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
 # l$h$h2[t] <- x$ep * ( sum(sapply(seq_len(t), function(ii)length(l$z[[ii]])))  - sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
-ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=T, type='Ljung-Box')
-if ( ac > x$learningThreshold) {
-  l$h$h1[t] <- x$ep *  sum(l$z[[t]]) 
-  l$h$h2[t] <- x$ep * ( length(l$z[[t]]) -  sum(l$z[[t]]) )
-} else {
-  l$h$h1[t] <- 0
-  l$h$h2[t] <- 0
-}
+# ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=T, type='Ljung-Box')
+# if ( ac > x$learningThreshold) {
+#   l$h$h1[t] <- x$ep *  sum(l$z[[t]]) 
+#   l$h$h2[t] <- x$ep * ( length(l$z[[t]]) -  sum(l$z[[t]]) )
+# } else {
+#   l$h$h1[t] <- 0
+#   l$h$h2[t] <- 0
+# }
+## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
+ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
+l$h$h1[t] <- x$a1 + sum(l$z[[t]])/mean(unlist(ac$statistic))
+l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /mean(unlist(ac$statistic))
 
 #### OUTCOME2
 ## Quantity
@@ -886,14 +890,19 @@ for (t in 2:x$Tau)
   
   ## TEST LEARNING VIA AUTOCORRELATION
   ## IF STRATEGIES ARE  THE SAME, AUTOCORRELATION SHOULD BE SIGNIFICANT --> DON'T COUNT THIS PERIOD z SAMPLE
-  ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=T, type='Ljung-Box')
-  if (  ac > x$learningThreshold ) {
-    l$h$h1[t] <- x$ep*sum(l$z[[t]])  + l$h$h1[t-1]
-    l$h$h2[t] <- x$ep*( length(l$z[[t]]) - sum(l$z[[t]]) ) + l$h$h2[t-1]
-  } else {
-    l$h$h1[t] <- l$h$h1[t-1]
-    l$h$h2[t] <- l$h$h2[t-1]
-  }
+  # ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=T, type='Ljung-Box')
+  # if (  ac > x$learningThreshold ) {
+  #   l$h$h1[t] <- x$ep*sum(l$z[[t]])  + l$h$h1[t-1]
+  #   l$h$h2[t] <- x$ep*( length(l$z[[t]]) - sum(l$z[[t]]) ) + l$h$h2[t-1]
+  # } else {
+  #   l$h$h1[t] <- l$h$h1[t-1]
+  #   l$h$h2[t] <- l$h$h2[t-1]
+  # }
+  ###
+  ## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
+  ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
+  l$h$h1[t] <- l$h$h1[t-1] + sum(l$z[[t]])/mean(unlist(ac$statistic))
+  l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /mean(unlist(ac$statistic))
   
   #### OUTCOME2
   ## Quantity
