@@ -3,7 +3,7 @@
 #
 ##
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
-source(file.path(getwd(),'csr_bayes_game_functions.R'))
+source(file.path(getwd(),'R','csr_bayes_game_functions.R'))
 
 
 ##  RUN MAIN GAME SIMULATION
@@ -48,8 +48,8 @@ x <- list(
 
 ## MAIN GAME CALL
 ## SET STRATEGY
-x$t1.change <- 3
-x$t2.change <- 7
+x$t1.change <- 2
+x$t2.change <- 8
 x$sig1.fixed <- c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change))
 x$sig2.fixed <- c(rep(0,x$t2.change),rep(1,x$Tau-x$t2.change))
 ## RUN
@@ -61,7 +61,7 @@ csrBayesGameSummaryPlots(x,l)
 ## PLOT GAME SUMMARY FOR GAME WITH CSR BREAKPOINT (START CSR AT t_star)
 file.title <- sprintf('csr_advantage_seller_pd_delay_q_%s_omeg_%s_rho_%s_w1_%s_c1_%s_downw_%s_db1_%s.png',
                       x$q,x$omega,x$rho,x$w1,x$c1,x$downweight,x$db1)
-png(file.title,height=8,width=6.5,units='in',res=250)
+png(file.path(getwd(),'img',file.title),height=8,width=6.5,units='in',res=250)
   csrBayesGameSummaryPlots(x,l)
 dev.off()
 
