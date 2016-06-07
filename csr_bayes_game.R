@@ -671,6 +671,7 @@ png('qstar_sig2_0_sig2_1_compare_matplot1.png',height=8,width=9,units='in',res=2
 dev.off()
 
 #-----------------------------------------------
+
 x <- list(
     v1=1
   , v2=1
@@ -690,18 +691,18 @@ x <- list(
   , a2=1
   , r1=.1
   , r2=.1
-  , w=1
+  , w=1.5
   , rho=.7
   , growth=.01
   , Y=1000
   , ep=1e-1
-  , N0=1000
-  , Tau=5
+  , N0=500
+  , Tau=6
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
-  , n.iter=3000
+  , n.iter=1000
   , downweight=FALSE
-  , q=.3
+  , q=.7
 )
 x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
 
@@ -842,7 +843,7 @@ for (t in 2:x$Tau)
                               getQstarSig21(x$w,x$rho,x$r2,x$c2,x$d2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1])
                               )
   l$sig$sig1[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
-  l$sig$sig2[t] <- 0##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
+  l$sig$sig2[t] <- ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
   
   ## CSR CONTINGENT COSTS
   l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1, x$gamma1, 0)
@@ -892,7 +893,7 @@ for (t in 2:x$Tau)
                h1t=x$a1 + l$h$h1[t-1], h2t=x$a2 + l$h$h2[t-1])
   modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
   l$qhat$mcmc[[t]] <- getQhatMcmc(data, modelstring, variable=c('q'), 
-                                n.chains=3, n.adapt=2000,n.iter.update=2000, 
+                                n.chains=3, n.adapt=1000,n.iter.update=x$n.iter, 
                                 n.iter.samples=x$n.iter, thin=3, seed=1111)
   l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
 
@@ -920,7 +921,6 @@ for (t in 2:x$Tau)
     l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) 
   }
 
-  
   #### OUTCOME2
   ## Quantity
   l$Q$Q1[t] <- getQty(x$Y, l$p$p1[t], l$B$B1[t]*(1-x$db1), sum(l$G$G1[[t]]))
@@ -932,24 +932,24 @@ for (t in 2:x$Tau)
 #---------------------------------------------------------------------------------
 
 print(l$sig)
-matplot(l$qhat$est,type='l')
 matplot(l$J,type='l')
 matplot(l$B/rowSums(l$B),type='l')
 matplot(l$Q/rowSums(l$Q),type='l')
 matplot(l$Pi/rowSums(l$Pi),type='l')
+matplot(l$qhat$est,type='l',ylim=c(0,1))
 
-for (t in 1:x$Tau) {
-  output <- l$qhat$mcmc[[t]]
-  n.chains <- length(l$qhat$mcmc[[t]])
-# fig.name <- paste0('mcmc_diagnostics_obs_q_',q,'_w_',w,'_sig1_',sig1,'_sig2_',sig2,'_t_',t,'.png')
-  # png(fig.name,height=6,width = 8, units = 'in', res = 250)
-  par(mfrow=c(2,2),mar=c(4,3,2,2))
-  mcmcplots::denplot(output,style = 'plain',auto.layout = F,main="Density of q")
-  mcmcplots::traplot(output,style = 'plain',auto.layout = F,main="Trace of q")
-  mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main="Thinned Running Mean of q")
-  mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main="Autocorrelation of q")
-# dev.off()
-}
+# for (t in 1:x$Tau) {
+#   output <- l$qhat$mcmc[[t]]
+#   n.chains <- length(l$qhat$mcmc[[t]])
+# # fig.name <- paste0('mcmc_diagnostics_obs_q_',q,'_w_',w,'_sig1_',sig1,'_sig2_',sig2,'_t_',t,'.png')
+#   # png(fig.name,height=6,width = 8, units = 'in', res = 250)
+#   par(mfrow=c(2,2),mar=c(4,3,2,2))
+#   mcmcplots::denplot(output,style = 'plain',auto.layout = F,main="Density of q")
+#   mcmcplots::traplot(output,style = 'plain',auto.layout = F,main="Trace of q")
+#   mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main="Thinned Running Mean of q")
+#   mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main="Autocorrelation of q")
+# # dev.off()
+# }
 
 plotMCMCdiagnostics <- function(output)
 {
