@@ -145,7 +145,8 @@ getPsi <- function(gamma,y,p,B)
 ##
 getB <- function(s,m,b,d)
 {
-  return(s*m + b*(1-d))
+  newB <- s*m + b*(1-d)
+  return(ifelse(newB > 0, newB, 0))
 }
 
 ##
@@ -155,7 +156,8 @@ getB <- function(s,m,b,d)
 getJ <- function(y,rho,gamma,c,B,f,J,dj)
 {
   netMargProfit <- ((rho+1)/rho) - (gamma/(rho*c))
-  return(y*netMargProfit*(B/f) + J*(1-dj))
+  newJ <- y*netMargProfit*(B/f) + J*(1-dj)
+  return(ifelse(newJ > 0, newJ, 0))
 }
 
 ##
@@ -165,7 +167,8 @@ getJ <- function(y,rho,gamma,c,B,f,J,dj)
 getG <- function(s,L,M,seed=1111)
 {
   set.seed(seed)
-  s.sample <- sample(s,M,replace = F)
+  size <- min(M, length(s))
+  s.sample <- sample(s,size,replace = F)
   return( sapply(s.sample, function(s)rbinom(n=1, size = L, s)) )
 }
 
@@ -378,7 +381,7 @@ getSigmaStar <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1, qhat)
 # @param x [list] all game parameters
 # @returns [list] game outcomes per variable and MCMC samples
 ##
-playCsrBayesGame <- function(x)
+playCsrBayesGame <- function(x, learn=TRUE)
 {
   x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
   ## allocate game array
@@ -416,10 +419,10 @@ playCsrBayesGame <- function(x)
   l$qstar$qstar2[1] <- .5 ## ??????????????????
   
   ## Initial values
-  l$J$J1[t] <- 30
-  l$J$J2[t] <- 70
-  l$B$B1[t] <- 300
-  l$B$B2[t] <- 700
+  l$J$J1[t] <- 50
+  l$J$J2[t] <- 500
+  l$B$B1[t] <- 1000
+  l$B$B2[t] <- 10000
   l$p$p1[t] <- 10
   l$p$p2[t] <- 10
   l$sig$sig1[t] <- 0
@@ -454,23 +457,26 @@ playCsrBayesGame <- function(x)
   # l$qstar$qstar2[t] <- getSigmaStar(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t], l$qhat$est$mu[t]) ## ??????????????????
   
   ## LEARN Qhat
-  data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
-               n=round(l$M[t]),  ## NO Z HERE
-               sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
-               J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
-               v1=x$v1,v2=x$v2,
-               w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
-               rho=x$rho,
-               h1t=x$a1 + l$h$h1[t], h2t=x$a2 + l$h$h2[t])
-  modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
-  l$qhat$mcmc[[t]]  <- getQhatMcmc(data, modelstring, variables=c('q'), 
-                                   n.chains=3, n.adapt=300,n.iter.update=300, 
-                                   n.iter.samples=300, thin=3, seed=1111)
-  l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
+  if(learn) {
+    data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
+                 n=round(l$M[t]),  ## NO Z HERE
+                 sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
+                 J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
+                 v1=x$v1,v2=x$v2,
+                 w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
+                 rho=x$rho,
+                 h1t=x$a1 + l$h$h1[t], h2t=x$a2 + l$h$h2[t])
+    modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
+    l$qhat$mcmc[[t]]  <- getQhatMcmc(data, modelstring, variables=c('q'), 
+                                     n.chains=3, n.adapt=100,n.iter.update=100, 
+                                     n.iter.samples=100, thin=2, seed=1111)
+    l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
+    
+    ## CHECK N_MIN  ITERATIONS WITH RAFTERY & LEWIS DIAGNOSTIC 
+    ## ERROR:  +/- 1%
+    x$n.iter <- getNIterRafDiag(l$qhat$mcmc[[t]], q = .025, r=.01, s=0.95)    
+  }
   
-  ## CHECK N_MIN  ITERATIONS WITH RAFTERY & LEWIS DIAGNOSTIC 
-  ## ERROR:  +/- 1%
-  x$n.iter <- getNIterRafDiag(l$qhat$mcmc[[t]], q = .025, r=.01, s=0.95)
   
   ## TEST LEARNING VIA AUTOCORRELATION
   # l$h$h1[t] <- x$ep * ( sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
@@ -484,7 +490,7 @@ playCsrBayesGame <- function(x)
   #   l$h$h2[t] <- 0
   # }
   ## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
-  if(x$downweight) {
+  if(x$downweight & learn) {
     ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
     l$h$h1[t] <- x$a1 + sum(l$z[[t]])/log(mean(unlist(ac$statistic)))
     l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /log(mean(unlist(ac$statistic)))
@@ -527,13 +533,18 @@ playCsrBayesGame <- function(x)
       l$sig$sig1[t] <- ifelse(!is.na(x$sig1.fixed[t]), x$sig1.fixed[t],  l$sig$sig1[t-1])
     else                     ## BAYES LEARNED STRATEGY
       l$sig$sig1[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
-
+    
     if(!is.na(x$sig2.fixed)) ## FIXED STRATEGY 
       l$sig$sig2[t] <- ifelse(!is.na(x$sig2.fixed[t]), x$sig2.fixed[t],  l$sig$sig2[t-1])
     else                     ## BAYES LEARNED STRATEGY
       l$sig$sig2[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
     
-
+    ## UPDATE STRATEGY CHANGES
+    if(l$sig$sig1[t] != l$sig$sig1[t-1] )
+      x$t1.change <- c(x$t1.change, t)
+    if(l$sig$sig2[t] != l$sig$sig2[t-1] )
+      x$t2.change <- c(x$t2.change, t)
+    
     ## CSR CONTINGENT COSTS
     l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1, x$gamma1, 0)
     l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
@@ -554,8 +565,8 @@ playCsrBayesGame <- function(x)
     l$J$J2[t] <- getJ(x$Y,x$rho,l$gamma$gamma2[t],x$c2,l$B$B2[t-1],l$f$f2[t],l$J$J2[t-1],x$dj2)
     s1.avg <- sum(l$G$G1[[t-1]]) / (length(l$G$G1[[t-1]])*l$L$L1[t])
     s2.avg <- sum(l$G$G2[[t-1]]) / (length(l$G$G2[[t-1]])*l$L$L2[t])
-    l$B$B1[t] <- getB(s1.avg, l$M[[t]], l$B$B1[t], x$db1)         
-    l$B$B2[t] <- getB(s2.avg, l$M[[t]], l$B$B1[t], x$db1) 
+    l$B$B1[t] <- getB(s1.avg, l$M[[t]], l$B$B1[t-1], x$db1)         
+    l$B$B2[t] <- getB(s2.avg, l$M[[t]], l$B$B2[t-1], x$db1) 
     
     # SAMPLE MARKET ATTITUDES
     l$z[[t]] <- rbinom(length(l$z[[t]]),1, x$q)
@@ -572,27 +583,30 @@ playCsrBayesGame <- function(x)
     
     
     ## LEARN Qhat
-    data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
-                 n=round(l$M[t]),  ## NO Z HERE
-                 sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
-                 J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
-                 v1=x$v1,v2=x$v2,
-                 w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
-                 rho=x$rho,
-                 h1t=x$a1 + l$h$h1[t-1], h2t=x$a2 + l$h$h2[t-1])
-    modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
-    l$qhat$mcmc[[t]] <- getQhatMcmc(data, modelstring, variable=c('q'), 
-                                    n.chains=3, n.adapt=1000,n.iter.update=x$n.iter, 
-                                    n.iter.samples=x$n.iter, thin=3, seed=1111)
-    l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
+    if(learn) {
+      data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
+                   n=round(l$M[t]),  ## NO Z HERE
+                   sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
+                   J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
+                   v1=x$v1,v2=x$v2,
+                   w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
+                   rho=x$rho,
+                   h1t=x$a1 + l$h$h1[t-1], h2t=x$a2 + l$h$h2[t-1])
+      modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
+      l$qhat$mcmc[[t]] <- getQhatMcmc(data, modelstring, variable=c('q'), 
+                                      n.chains=3, n.adapt=1000,n.iter.update=x$n.iter, 
+                                      n.iter.samples=x$n.iter, thin=3, seed=1111)
+      l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
+      
+      ## MCMC SAMPLE MEAN
+      getNaiveMCMCseMean(l$qhat$mcmc[[t]])    
+      
+      ## MCMC DIAGNOSTICS
+      getHeidConvDiag(l$qhat$mcmc[[t]])
+      gelman.plot(l$qhat$mcmc[[t]], main=sprintf('\n\niteration: %s',t))
+      plotMCMCdiagnostics(l$qhat$mcmc[[t]],t)      
+    }
     
-    ## MCMC SAMPLE MEAN
-    getNaiveMCMCseMean(l$qhat$mcmc[[t]])    
-    
-    ## MCMC DIAGNOSTICS
-    getHeidConvDiag(l$qhat$mcmc[[t]])
-    gelman.plot(l$qhat$mcmc[[t]], main=sprintf('\n\niteration: %s',t))
-    plotMCMCdiagnostics(l$qhat$mcmc[[t]],t)
     
     ## TEST LEARNING VIA AUTOCORRELATION
     ## IF STRATEGIES ARE  THE SAME, AUTOCORRELATION SHOULD BE SIGNIFICANT --> DON'T COUNT THIS PERIOD z SAMPLE
@@ -606,7 +620,7 @@ playCsrBayesGame <- function(x)
     # }
     ###
     ## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
-    if(x$downweight) {
+    if(x$downweight & learn ) {
       ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
       l$h$h1[t] <- l$h$h1[t-1] + sum(l$z[[t]])/log(mean(unlist(ac$statistic)))
       l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /log(mean(unlist(ac$statistic)))
@@ -631,14 +645,15 @@ playCsrBayesGame <- function(x)
 #
 #
 ##
-csrBayesGameSummaryPlots <- function(x,l)
+getCsrBayesGameSummaryPlots <- function(x,l)
 {
   par(mfrow=c(3,2),mar=c(4,2.5,4,1))
-  matplot(l$J/rowSums(l$J),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(J)));abline(v=c(x$t1.change,x$t2.change),lty=1:2,col=1:2)
-  matplot(l$B/rowSums(l$B),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(B)));legend('topright',legend=1:2,col=1:2,lty=1:2,pch=16);abline(v=c(x$t1.change,x$t2.change),lty=1:2,col=1:2)
-  matplot(l$Q/rowSums(l$Q),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(Qty)));abline(v=c(x$t1.change,x$t2.change),lty=1:2,col=1:2)
-  matplot(l$Pi,            xlab=('Game Period (t)'),            type='o',pch=16,main=expression(pi));abline(h=0,col='black');abline(v=c(x$t1.change,x$t2.change),lty=1:2,col=1:2)
+  matplot(l$J/rowSums(l$J),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(J)));abline(v=c(x$t1.change,x$t2.change),lty=2)
+  matplot(l$B/rowSums(l$B),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(B)));legend('topright',legend=1:2,col=1:2,lty=1:2,pch=16);abline(v=c(x$t1.change,x$t2.change),lty=2)
+  matplot(l$Q/rowSums(l$Q),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(Qty)));abline(v=c(x$t1.change,x$t2.change),lty=2)
+  matplot(l$Pi,            xlab=('Game Period (t)'),            type='o',pch=16,main=expression(pi));abline(h=0,col='black');abline(v=c(x$t1.change,x$t2.change),lty=2)
   matplot(l$h/rowSums(l$h),xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=16,main=expression(tilde(h)==Sigma[i]*z[i]),col=c('steelblue','darkgreen'))
-  matplot(l$qhat$est,      xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=c(NA,NA,16,NA,NA),main=expression(hat(q)),lty=c(3,2,1,2,3),lwd=c(1,1,2,1,1),col=c('black','black','steelblue','black','black'));abline(h=x$q,col='black')
+  if(any(sapply(l$qhat$mcmc,function(x) length(na.omit(x)) > 0)))
+    matplot(l$qhat$est,  xlab=('Game Period (t)'),ylim=c(0,1),type='o',pch=c(NA,NA,16,NA,NA),main=expression(hat(q)),lty=c(3,2,1,2,3),lwd=c(1,1,2,1,1),col=c('black','black','steelblue','black','black'));abline(h=x$q,col='black')
 }
 
