@@ -43,34 +43,34 @@ source(file.path(getwd(),'R','csr_bayes_game_functions.R'))
 x <- list(
   v1= 1
   , v2=1
-  , db1=.1  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-  , db2=.1  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-  , dj1=.02
-  , dj2=.02
+  , db1=.2  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db2=.2  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , dj1=.05
+  , dj2=.05
   , c1=.5       ## seller MARGINAL cost
   , c2=.5       ## seller MARGINAL cost
-  , gamma1=.1  ## seller CSR cost
-  , gamma2=.1  ## seller CSR cost
-  , w1=.01      ## Platform operator MARGINAL cost
-  , w2=.01      ## Platform operator MARGINAL cost
+  , gamma1=.05  ## seller CSR cost
+  , gamma2=.05  ## seller CSR cost
+  , w1=.02      ## Platform operator MARGINAL cost
+  , w2=.02      ## Platform operator MARGINAL cost
   , psi1=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
   , psi2=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
   , a1=1
   , a2=1
   , r1=.1
   , r2=.1
-  , omega=2
-  , rho=1.2
+  , omega=1.5
+  , rho=1.1
   , growth=.001
   , Y=1000
   , ep=1e-1
   , N0=500
-  , Tau=60
+  , Tau=600
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
   , n.iter=1000
   , downweight=TRUE
-  , q=.5
+  , q=.3
   , sig1.fixed=NA
   , sig2.fixed=NA
   , t1.change=NA
@@ -79,10 +79,10 @@ x <- list(
 
 ## MAIN GAME CALL
 ## SET STRATEGY
-x$t1.change <- 10
-x$t2.change <- 25
+x$t1.change <- 20
+x$t2.change <- 200
 x$sig1.fixed <- c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change))
-x$sig2.fixed <- c(rep(0,x$t2.change),rep(1,x$Tau-x$t2.change))
+x$sig2.fixed <- c(rep(0,x$t2.change),rep(0,x$Tau-x$t2.change))
 ## RUN
 l <- playCsrBayesGame(x, learn=FALSE)
 ## OUTPUT

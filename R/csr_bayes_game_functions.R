@@ -350,29 +350,33 @@ getQstarSig21 <- function(x,p1,p2,J1,J2,B1)
   return(num/(den.a+den.b+den.c))
 }
 
-##
-#
-#
-##
-getSigmaStar <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1, qhat)
+# ##
+# #
+# #
+# ##
+# getSigmaStar <- function(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1, qhat)
+# {
+#   ## FIND OPPONENT CUTOFF q
+#   qstar2.if.sig1.0 <- getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
+#   qstar2.if.sig1.1 <- getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
+#   # FIND OPPONENT STRATEGY DECISION AS FUNTION OF OWN STRATEGY 
+#   sig2.if.sig1.0 <- ifelse(qstar2.if.sig1.0 > qhat, 1, 0)
+#   sig2.if.sig1.1 <- ifelse(qstar2.if.sig1.1 > qhat, 1, 0)
+#   ## KNOWING WHAT THE OPPONENT WILL PLAY IF WE PLAY 0,  GET PROFITABLE STRATEGY COMPARED TO qhat
+#   qstar1.of.sig2.if.sig1.0 <- ifelse(sig2.if.sig1.0==0,
+#                                      getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1),
+#                                      getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1))
+#   sig1.of.sig2.if.sig1.0 <- ifelse(qstar1.of.sig2.if.sig1.0 > qhat, 1, 0)
+#   ## KNOWING WHAT THE OPPONENT WILL PLAY IF WE PLAY 1,  GET PROFITABLE STRATEGY COMPARED TO qhat
+#   qstar1.of.sig2.if.sig1.1 <- ifelse(sig2.if.sig1.1==0,
+#                                      getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1),
+#                                      getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1))
+#   sig1.of.sig2.if.sig1.1 <- ifelse(qstar1.of.sig2.if.sig1.1 > qhat, 1, 0)
+#   return()  # ??????????????????????????????????????
+# }
+getSigmaStar <- function()
 {
-  ## FIND OPPONENT CUTOFF q
-  qstar2.if.sig1.0 <- getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
-  qstar2.if.sig1.1 <- getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1)
-  # FIND OPPONENT STRATEGY DECISION AS FUNTION OF OWN STRATEGY 
-  sig2.if.sig1.0 <- ifelse(qstar2.if.sig1.0 > qhat, 1, 0)
-  sig2.if.sig1.1 <- ifelse(qstar2.if.sig1.1 > qhat, 1, 0)
-  ## KNOWING WHAT THE OPPONENT WILL PLAY IF WE PLAY 0,  GET PROFITABLE STRATEGY COMPARED TO qhat
-  qstar1.of.sig2.if.sig1.0 <- ifelse(sig2.if.sig1.0==0,
-                                     getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1),
-                                     getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1))
-  sig1.of.sig2.if.sig1.0 <- ifelse(qstar1.of.sig2.if.sig1.0 > qhat, 1, 0)
-  ## KNOWING WHAT THE OPPONENT WILL PLAY IF WE PLAY 1,  GET PROFITABLE STRATEGY COMPARED TO qhat
-  qstar1.of.sig2.if.sig1.1 <- ifelse(sig2.if.sig1.1==0,
-                                     getQstarSig20(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1),
-                                     getQstarSig21(omega,rho,r1,c1,w1,v1,v2,p1,p2,J1,J2,y,gamma1,B1))
-  sig1.of.sig2.if.sig1.1 <- ifelse(qstar1.of.sig2.if.sig1.1 > qhat, 1, 0)
-  return()  # ??????????????????????????????????????
+  
 }
 
 ##
@@ -419,10 +423,10 @@ playCsrBayesGame <- function(x, learn=TRUE)
   l$qstar$qstar2[1] <- .5 ## ??????????????????
   
   ## Initial values
-  l$J$J1[t] <- 50
+  l$J$J1[t] <- 100
   l$J$J2[t] <- 500
-  l$B$B1[t] <- 1000
-  l$B$B2[t] <- 10000
+  l$B$B1[t] <- 10000
+  l$B$B2[t] <- 50000
   l$p$p1[t] <- 10
   l$p$p2[t] <- 10
   l$sig$sig1[t] <- 0
