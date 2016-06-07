@@ -699,6 +699,8 @@ x <- list(
   , Tau=5
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
+  , n.iter=3000
+  , downweight=FALSE
   , q=.3
 )
 x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
@@ -802,9 +804,15 @@ l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion 
 #   l$h$h2[t] <- 0
 # }
 ## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
-ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
-l$h$h1[t] <- x$a1 + sum(l$z[[t]])/mean(unlist(ac$statistic))
-l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /mean(unlist(ac$statistic))
+if(x$downweight) {
+  ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
+  l$h$h1[t] <- x$a1 + sum(l$z[[t]])/mean(unlist(ac$statistic))
+  l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /mean(unlist(ac$statistic))
+} else {
+  l$h$h1[t] <- x$a1 + sum(l$z[[t]])
+  l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) )
+}
+
 
 #### OUTCOME2
 ## Quantity
@@ -885,8 +893,11 @@ for (t in 2:x$Tau)
   modelstring <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
   l$qhat$mcmc[[t]] <- getQhatMcmc(data, modelstring, variable=c('q'), 
                                 n.chains=3, n.adapt=2000,n.iter.update=2000, 
-                                n.iter.samples=2000, thin=2, seed=1111)
+                                n.iter.samples=x$n.iter, thin=3, seed=1111)
   l$qhat$est[t, ] <- getQhatEst(l$qhat$mcmc[[t]], probs=x$probs, burninProportion = .2)
+
+  ## PLOTS MCMC DIAGNOSTICS
+  plotMCMCdiagnostics(l$qhat$mcmc[[t]])
   
   ## TEST LEARNING VIA AUTOCORRELATION
   ## IF STRATEGIES ARE  THE SAME, AUTOCORRELATION SHOULD BE SIGNIFICANT --> DON'T COUNT THIS PERIOD z SAMPLE
@@ -900,9 +911,15 @@ for (t in 2:x$Tau)
   # }
   ###
   ## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
-  ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
-  l$h$h1[t] <- l$h$h1[t-1] + sum(l$z[[t]])/mean(unlist(ac$statistic))
-  l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /mean(unlist(ac$statistic))
+  if(x$downweight) {
+    ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
+    l$h$h1[t] <- l$h$h1[t-1] + sum(l$z[[t]])/mean(unlist(ac$statistic))
+    l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) /mean(unlist(ac$statistic))
+  } else {
+    l$h$h1[t] <- l$h$h1[t-1] + sum(l$z[[t]])
+    l$h$h2[t] <- l$h$h2[t-1] + ( length(l$z[[t]]) - sum(l$z[[t]]) ) 
+  }
+
   
   #### OUTCOME2
   ## Quantity
@@ -918,6 +935,8 @@ print(l$sig)
 matplot(l$qhat$est,type='l')
 matplot(l$J,type='l')
 matplot(l$B/rowSums(l$B),type='l')
+matplot(l$Q/rowSums(l$Q),type='l')
+matplot(l$Pi/rowSums(l$Pi),type='l')
 
 for (t in 1:x$Tau) {
   output <- l$qhat$mcmc[[t]]
@@ -932,6 +951,15 @@ for (t in 1:x$Tau) {
 # dev.off()
 }
 
+plotMCMCdiagnostics <- function(output)
+{
+  n.chains <- length(output)
+  par(mfrow=c(2,2),mar=c(4,3,2,2))
+  mcmcplots::denplot(output,style = 'plain',auto.layout = F,main="Density of q")
+  mcmcplots::traplot(output,style = 'plain',auto.layout = F,main="Trace of q")
+  mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main="Thinned Running Mean of q")
+  mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main="Autocorrelation of q")
+}
 
 
 
