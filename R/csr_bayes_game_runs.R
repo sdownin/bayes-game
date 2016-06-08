@@ -43,34 +43,34 @@ source(file.path(getwd(),'R','csr_bayes_game_functions.R'))
 x <- list(
   v1= 1
   , v2=1
-  , db1=.02  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-  , db2=.02  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db1=.2  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db2=.2  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
   , dj1=.05
   , dj2=.05
   , c1=.5       ## seller MARGINAL cost
   , c2=.5       ## seller MARGINAL cost
   , gamma1=.05  ## seller CSR cost
   , gamma2=.05  ## seller CSR cost
-  , w1=.02      ## Platform operator MARGINAL cost
-  , w2=.02      ## Platform operator MARGINAL cost
-  , psi1=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
-  , psi2=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
+  , w1=.01      ## Platform operator MARGINAL cost
+  , w2=.01      ## Platform operator MARGINAL cost
+  , psi1=.005    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
+  , psi2=.005    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
   , a1=1
   , a2=1
   , r1=.1
   , r2=.1
   , omega=1.5
   , rho=1.1
-  , growth=.001
+  , growth=.01
   , Y=1000
   , ep=1e-1
   , N0=500
-  , Tau=10
+  , Tau=150
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
   , n.iter=1000
   , downweight=TRUE
-  , q=.3
+  , q=.5
   , sig1.fixed=NA
   , sig2.fixed=NA
   , t1.change=NA
@@ -79,8 +79,8 @@ x <- list(
 
 ## MAIN GAME CALL
 ## SET STRATEGY
-x$t1.change <- 2
-x$t2.change <- 4
+x$t1.change <- 10
+x$t2.change <- 20
 x$sig1.fixed <- c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change))
 x$sig2.fixed <- c(rep(0,x$t2.change),rep(0,x$Tau-x$t2.change))
 ## RUN
@@ -95,7 +95,7 @@ getCsrBayesGameSummaryPlots(x,l)
 file.title <- sprintf('csr_advantage_seller_pd_delay_q_%s_omeg_%s_rho_%s_w1_%s_c1_%s_downw_%s_db1_%s.png',
                       x$q,x$omega,x$rho,x$w1,x$c1,x$downweight,x$db1)
 png(file.path(getwd(),'img',file.title),height=8,width=6.5,units='in',res=250)
-csrBayesGameSummaryPlots(x,l)
+getCsrBayesGameSummaryPlots(x,l)
 dev.off()
 
 

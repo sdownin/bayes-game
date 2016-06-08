@@ -423,10 +423,10 @@ playCsrBayesGame <- function(x, learn=TRUE)
   l$qstar$qstar2[1] <- .5 ## ??????????????????
   
   ## Initial values
-  l$J$J1[t] <- 30
-  l$J$J2[t] <- 120
-  l$B$B1[t] <- 300
-  l$B$B2[t] <- 1200
+  l$J$J1[t] <- 50
+  l$J$J2[t] <- 250
+  l$B$B1[t] <- 500
+  l$B$B2[t] <- 2500
   l$p$p1[t] <- 10
   l$p$p2[t] <- 10
   l$sig$sig1[t] <- 0
