@@ -396,7 +396,7 @@ playCsrBayesGame <- function(x, learn=TRUE)
                 est=data.frame(L99=rep(0,x$Tau),L95=rep(0,x$Tau),
                                mu=rep(0,x$Tau),
                                U95=rep(0,x$Tau),U99=rep(0,x$Tau)))
-    , qstar=data.frame(qstar1=rep(0,x$Tau), qstart2=rep(0,x$Tau))
+    , qstar=data.frame(qstar1=rep(0,x$Tau), qstar2=rep(0,x$Tau))
     , p=data.frame(p1=rep(10,x$Tau), p2=rep(10,x$Tau))
     , gamma=data.frame(gamma1=rep(0,x$Tau), gamma2=rep(0,x$Tau))
     , psi=data.frame(psi1=rep(0,x$Tau), psi2=rep(0,x$Tau))
@@ -427,8 +427,8 @@ playCsrBayesGame <- function(x, learn=TRUE)
   l$J$J2[t] <- 250
   l$B$B1[t] <- 500
   l$B$B2[t] <- 2500
-  l$p$p1[t] <- 10
-  l$p$p2[t] <- 10
+  l$p$p1[t] <- x$c1 * x$rho
+  l$p$p2[t] <- x$c2 * x$rho
   l$sig$sig1[t] <- 0
   l$sig$sig2[t] <- 0
   l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1,x$gamma2, 0)
@@ -558,8 +558,8 @@ playCsrBayesGame <- function(x, learn=TRUE)
     l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, x$psi2, 0)
     
     ## PERIOD PARAMETERS
-    l$p$p1[t] <- 10
-    l$p$p2[t] <- 10
+    l$p$p1[t] <- x$c1 * x$rho
+    l$p$p2[t] <- x$c2 * x$rho
     l$f$f1[t] <- 1
     l$f$f2[t] <- 1
     l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
