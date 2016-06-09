@@ -197,21 +197,38 @@ ggsave('demand_by_q_z_facets_ribbon_ggplot_12.png', height=3.5,width=7.5,units='
 # plot(sq ~ omegavec, ylim=c(0,.021), type='o',pch=16,xlab=expression(omega),ylab=expression(psi[1]))
 # abline(h=psibar, lty=2)
 
-t <- 2
 omegavec <- 2^seq(-5,5)
 psibar <- x$r1*l$p$p1[t]-x$w1
 rhovec <- c(0,1,2,3)
 sq <- sapply(rhovec,function(r)getMaxPsi(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
-file.title <- sprintf('psi_func_omega_LnLn_pool_sep_j1_%s_j2_%s_p1_%s_p2_%s.png',l$J$J1[t],l$J$J2[t],l$p$p1[t],l$p$p2[t])
-png(file.path(getwd(),'img',file.title),height=5,width=6,units='in',res=250)
-  par(mar=c(4.1,4.1,1.5,1.5))
-  matplot(x= omegavec, y=sq,log='xy',type='o',col='black',pch=17:20,xlab=expression(ln(omega)),
-       ylab=expression(ln(psi[1])))
+file.title <- sprintf('psi_func_omega_LnLn2_pool_sep_J1_J2_biplot_p1_%s_p2_%s.png',l$p$p1[t],l$p$p2[t])
+png(file.path(getwd(),'img',file.title),height=4.5,width=9,units='in',res=250)
+  par(mfrow=c(1,2),mar=c(4.1,4.4,3,1.5))
+  t <- 8
+  sq <- sapply(rhovec,function(r)getMaxPsi(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
+  matplot(x= omegavec, y=sq,log='xy',type='o',col='black',pch=17:20,
+          xlab=expression('CSR Response'~ln(omega)),
+          ylab=expression('CSR Cost'~ln(psi[1])), 
+          main=expression('Sellers Ratio '~J[1]/J[2]~'='), cex=2)
   legend('bottomright',title=expression(tilde(rho)),legend=rhovec,col='black',lty=1:4,pch=17:20)
   mtext(expression(bar(psi[1])),side=2,at = psibar, line=2.5, col='darkred')
-  mtext(expression(Pooling:~sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=8,line=-10,col='darkblue')
-  mtext(expression(Separating:~sigma[1]!=sigma[2]),side=3,at=.1,line=-4,col='darkblue')
-  abline(h=psibar, lty=2, col='red')
+  mtext(expression(Pooling:~sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=6,line=-9,col='darkblue')
+  mtext(expression(Separating:~sigma[1]!=sigma[2]),side=3,at=.2,line=-2,col='darkblue')
+  mtext(sprintf('%.1f',l$J$J1[t]/l$J$J2[t]),side=3,at=10,line=1)
+  abline(h=c(0,psibar), lty=2, col='darkred')
+  #
+  t <- 140
+  sq <- sapply(rhovec,function(r)getMaxPsi(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
+  matplot(x= omegavec, y=sq,log='xy',type='o',col='black',pch=17:20,
+          xlab=expression('CSR Response'~ln(omega)),
+          ylab=expression('CSR Cost'~ln(psi[1])), 
+          main=expression('Sellers Ratio '~J[1]/J[2]~'='), cex=2)
+  legend('bottomright',title=expression(tilde(rho)),legend=rhovec,col='black',lty=1:4,pch=17:20)
+  mtext(expression(bar(psi[1])),side=2,at = psibar, line=2.5, col='darkred')
+  mtext(expression(Pooling:~sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=6,line=-9,col='darkblue')
+  mtext(expression(Separating:~sigma[1]!=sigma[2]),side=3,at=.2,line=-2,col='darkblue')
+  mtext(sprintf('%.1f',l$J$J1[t]/l$J$J2[t]),side=3,at=10,line=1)
+  abline(h=c(0,psibar), lty=2, col='darkred')
 dev.off()
 
 #------------------------------------------------------------------------
