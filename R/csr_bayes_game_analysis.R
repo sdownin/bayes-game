@@ -3,7 +3,7 @@
 #
 ##
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
-source(file.path(getwd(),'csr_bayes_game_functions.R'))
+source(file.path(getwd(),'R','csr_bayes_game_functions.R'))
 
 #------------------ SIMULATE FROM GROUND TRUTH -----------------------------
 
@@ -99,57 +99,72 @@ dev.off()
 
 ##-------------- PLOT SIMULATION ---------------------------------------
 ## Run 100 simulations each at 4 value s of q
-runs <- 100
-N <- 500
-Y <- 1000
+runs <- 50
+N <- 300
+Y <- 500
 qvec <- seq(0,1,.025)
+omegavec <- c(.5,1,2)
+rhovec <- c(.7,1,1.3)
 df.comb <- data.frame()
 li.comb <- list()
 set.seed(111)
 for (run in 1:runs) {
   df <- data.frame() 
-  for (q in qvec) {
-    df.sim <- getSimulation(q=q, N=N, Y=Y, setSeed = FALSE)
-    df.sim$q <- q
-    df <- rbind(df,df.sim)
+  for(omega in omegavec) {
+    for (rho in rhovec) {
+       for (q in qvec) {
+        df.sim <- getSimulation(q=q, N=N, Y=Y, theta = getTheta(omega=omega, rho=rho), setSeed = FALSE)
+        df.sim$q <- q
+        df.sim$omega <- omega
+        df.sim$rho <- rho
+        df <- rbind(df,df.sim)
+      }
+    }
   }
   df$z <- as.factor(paste0(ifelse(df$z==1,'Hedonic ','Utilitarian '),'(z=',df$z,')'))
   df.2 <- rbind(
     data.frame(Demand=as.integer(df$G1),
                z=df$z,
                q=df$q,
-               Platform='1 (CSR)'),
+               Platform='1 (CSR)',
+               Strength=df$omega,
+               Network=df$rho),
     data.frame(Demand=as.integer(df$G2),
                z=df$z,
                q=df$q,
-               Platform='2 (NO CSR)')
+               Platform='2 (NO CSR)',
+               Strength=df$omega,
+               Network=df$rho)
   )
-  df.counts <- ddply(.data = df.2, .variables = .(z,q,Platform),summarise,counts=sum(Demand))
+  df.counts <- ddply(.data = df.2, .variables = .(z,q,Platform,Strength,Network),summarise,counts=sum(Demand))
   li.comb[[run]] <- df.counts
   df.comb <- rbind(df.comb,df.counts)
 }
 # values=c(rgb(.8,.8,.5,.7), rgb(.1,.1,.5,.7))
 
 # GET RIBBON 95% CREDIBLE INTERVALS
-df.ci <- data.frame(z=NA, q=NA, Platform=NA, L99=NA, mu=NA, U99=NA)
+df.ci <- data.frame(z=NA, q=NA, Platform=NA, Strength=NA, Network=NA, L99=NA, mu=NA, U99=NA)
 counter <- 1
 for (i in levels(df.counts$z)) {
   for (j in unique(df.counts$q)) {
     for (k in levels(df.counts$Platform)) {
-      x <- df.comb[which(df.comb$z==i & df.comb$q==j & df.comb$Platform==k), 'counts']
-      df.ci[counter,c('z','q','Platform')] <- c(i,j,k)
-      df.ci[counter,c('L99','mu','U99')] <- quantile(na.omit(x), probs = c(.005, .5, .995))
-      counter <- counter + 1
+      for (l in unique(df.counts$Strength)) {
+        for (m in unique(df.counts$Network)) {
+          x <- df.comb[which(df.comb$z==i & df.comb$q==j & df.comb$Platform==k & df.comb$Strength==l & df.comb$Network==m), 'counts']
+          df.ci[counter,c('z','q','Platform','Strength','Network')] <- c(i,j,k,l,m)
+          df.ci[counter,c('L99','mu','U99')] <- quantile(na.omit(x), probs = c(.005, .5, .995))
+          counter <- counter + 1          
+        }
+      }
     }
   }
 }
-
 p <- ggplot(aes(x=as.numeric(q),y=mu), data=na.omit(df.ci)) +
   # geom_smooth(aes(x=q, y=counts, colour=z), data=df.comb) +
   geom_point(aes(colour=Platform, shape=Platform)) +
   geom_line(aes(colour=Platform, linetype=Platform)) + 
   geom_ribbon(aes(group=Platform,ymin=L99,ymax=U99), alpha=.3) +
-  facet_wrap( ~ z) +  
+  facet_grid( Strength ~ z + Network ) +  
   xlab('Proportion of Hedonic Buyers (q)') + 
   ylab('Quantity Demanded') +
   # scale_shape_discrete(name="Attitude",labels=c('Utilitarian (z=0)','Hedonic (z=1)')) +
@@ -173,7 +188,33 @@ ggsave('demand_by_q_z_facets_ribbon_ggplot_12.png', height=3.5,width=7.5,units='
 # dev.off()
 
 
+#--------------------------------------------------------------------------
+## PLOT MAX PLATFORM CSR COST FOR POOLING CSR EQ AS FUNCTION OF CSR RESPONSE STRENGTH
 
+
+# psibar <- x$r1*l$p$p1[t]-x$w1
+# sq <- getMaxPsi(omegavec,x$rho,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t])
+# plot(sq ~ omegavec, ylim=c(0,.021), type='o',pch=16,xlab=expression(omega),ylab=expression(psi[1]))
+# abline(h=psibar, lty=2)
+
+t <- 2
+omegavec <- 2^seq(-5,5)
+psibar <- x$r1*l$p$p1[t]-x$w1
+rhovec <- c(0,1,2,3)
+sq <- sapply(rhovec,function(r)getMaxPsi(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
+file.title <- sprintf('psi_func_omega_LnLn_pool_sep_j1_%s_j2_%s_p1_%s_p2_%s.png',l$J$J1[t],l$J$J2[t],l$p$p1[t],l$p$p2[t])
+png(file.path(getwd(),'img',file.title),height=5,width=6,units='in',res=250)
+  par(mar=c(4.1,4.1,1.5,1.5))
+  matplot(x= omegavec, y=sq,log='xy',type='o',col='black',pch=17:20,xlab=expression(ln(omega)),
+       ylab=expression(ln(psi[1])))
+  legend('bottomright',title=expression(tilde(rho)),legend=rhovec,col='black',lty=1:4,pch=17:20)
+  mtext(expression(bar(psi[1])),side=2,at = psibar, line=2.5, col='darkred')
+  mtext(expression(Pooling:~sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=8,line=-10,col='darkblue')
+  mtext(expression(Separating:~sigma[1]!=sigma[2]),side=3,at=.1,line=-4,col='darkblue')
+  abline(h=psibar, lty=2, col='red')
+dev.off()
+
+#------------------------------------------------------------------------
 ## JAGS MODEL  
 
 # getModelstring <- function(sig1,sig2)

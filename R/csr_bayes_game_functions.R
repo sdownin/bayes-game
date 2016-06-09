@@ -36,11 +36,11 @@ share.list <- function(x,k=1)
 #
 #
 ##
-share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,w,z,rho,k=1) 
+share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,z,rho,k=1) 
 {
   out <- sapply(z, function(z_i){
-    th1 <- p2 * (v1 + w * sig1 * z_i)
-    th2 <- p1 * (v2 + w * sig2 * z_i)
+    th1 <- p2 * (v1 + omega * sig1 * z_i)
+    th2 <- p1 * (v2 + omega * sig2 * z_i)
     if(k==1) {
       num <- (th1/th2) * J1^rho
       denom <- (th1/th2) * J1^rho  + J2^rho
@@ -58,9 +58,22 @@ share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,w,z,rho,k=1)
 # @returns list to be used as `x` argument in demand share() function
 ##
 getTheta <- function(v1 = 1, v2 = 1, J1 = 40, J2 = 60, p1 = 10, p2 = 10, 
-                     sig1 = 1, sig2 = 0, w = 1.5 , rho = 1, z = NA)
+                     sig1 = 1, sig2 = 0, omega = 1.5 , rho = 1, z = NA)
 {
-  return(list(v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,sig1=sig1,sig2=sig2,w=w,rho=rho,z=z))
+  return(list(v1=v1,v2=v2,J1=J1,J2=J2,p1=p1,p2=p2,sig1=sig1,sig2=sig2,omega=omega,rho=rho,z=z))
+}
+
+##
+#
+#
+##
+getMaxPsi <- function(omega,rho,x,p1,p2,J1,J2)
+{
+  r1 <- x$r1; w1 <- x$w1; v1 <- x$v1; v2 <- x$v2;
+  a <- (r1*p1-w1)*(omega/(v1+omega))
+  b.numer <- (v2 + omega) * p1 * J2^rho
+  b.denom <- v1*p2*J1^rho + (v2+omega)*p1*J2^rho
+  return (a * b.numer / b.denom)
 }
 
 ##
@@ -185,9 +198,9 @@ getQty <- function(y,p,netB,G)
 #
 #
 ##
-getPi <- function(r,w,psi,rho,c,Q,O,y)
+getPi <- function(r,omega,psi,rho,c,Q,O,y)
 {
-  netMargProfit <-  r - ( (w+psi)/(rho*c) )
+  netMargProfit <-  r - ( (omega+psi)/(rho*c) )
   return( netMargProfit*Q - (O/y) )
 }
 
@@ -220,8 +233,8 @@ getModelstring <- function(sig1,sig2)
   paste0("model{
          for (i in 1:n) {
          z[i] ~ dbern(q)
-         th1[i] <- p2*(v1 + w*sig1*z[i])
-         th2[i] <- p1*(v2 + w*sig2*z[i])
+         th1[i] <- p2*(v1 + omega*sig1*z[i])
+         th2[i] <- p1*(v2 + omega*sig2*z[i])
          s[i] <- ",ifelse(sig2 > sig1,
                           "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
                           "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
@@ -467,7 +480,7 @@ playCsrBayesGame <- function(x, learn=TRUE)
                  sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
                  J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
                  v1=x$v1,v2=x$v2,
-                 w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
+                 omega=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
                  rho=x$rho,
                  h1t=x$a1 + l$h$h1[t], h2t=x$a2 + l$h$h2[t])
     modelstring1 <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
@@ -595,7 +608,7 @@ playCsrBayesGame <- function(x, learn=TRUE)
                    sig1=l$sig$sig1[t], sig2=l$sig$sig2[t],
                    J1=l$J$J1[t],J2=l$J$J2[t],p1=l$p$p1[t],p2=l$p$p2[t],
                    v1=x$v1,v2=x$v2,
-                   w=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
+                   omega=ifelse(l$qhat$est$mu[t]>0, x$omega, 0),    ## ensure no signal when q=0
                    rho=x$rho,
                    h1t=x$a1 + l$h$h1[t-1], h2t=x$a2 + l$h$h2[t-1])
       modelstring1 <- getModelstring(l$sig$sig1[t], l$sig$sig2[t])
