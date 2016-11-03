@@ -3,9 +3,9 @@
 #  Bayesian Vote with the Wallet Game Analysis
 #
 ##
-source(file.path(getwd(),'R','bvwg_r6_jags.R'))      # JAGS
-source(file.path(getwd(),'R','bvwg_r6_platform.R'))  # PLATFORM
-source(file.path(getwd(),'R','bvwg_r6_game.R'))      # GAME
+source(file.path(getwd(),'R','bvwg_r6_jags.R'))      # {.GLOBAL} JAGS
+source(file.path(getwd(),'R','bvwg_r6_platform.R'))  # {.GLOBAL} PLATFORM
+source(file.path(getwd(),'R','bvwg_r6_game.R'))      # {.GLOBAL} GAME
 
 
 getModelStr <- function() {
