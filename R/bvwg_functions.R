@@ -430,7 +430,7 @@ playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
   x$N <- ceiling(x$N0*(1+x$growth)^(x$Tau-1))
   ## allocate game array
   l <- list(
-    q.true=x$q
+      q.true=x$q
     , M=rep(0,x$Tau)
     , qhat=list(mcmc=list(),
                 est=data.frame(L99=rep(0,x$Tau),L95=rep(0,x$Tau),
@@ -452,11 +452,10 @@ playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
     , s=list()  ##getGrowingVector(x$N0,x$Tau,x$growth)
     , G=list(G1=list(),G2=list())
   )
-  
   l$q.epsilon <- sapply(rnorm(x$Tau, mean = x$q, sd = .05), function(x){
     ifelse(x < 0, 0, ifelse(x > 1, 1, x))
   })
-  
+  cat(l$q.epsilon)
   t <- 1
   
   #--------------------------------- INITIAL PERIOD ------------------------------------------
@@ -496,14 +495,6 @@ playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
   l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
   l$G$G2[[t]] <- getG( 1-l$s[[t]], l$L$L2[t], l$M[t])
   
-  ## Qstar THRESHOLD
-  # qstar1.0 <- getQstarSig20(x$omega,x$rho,x$r1,x$c1,x$w1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t])
-  # qstar1.1 <- getQstarSig21(x$omega,x$rho,x$r1,x$c1,x$w1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t])
-  # qstar2.0 <- getQstarSig20(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t])
-  # qstar2.1 <- getQstarSig21(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t])
-  # l$qstar$qstar1[t] <- getSigmaStar(x$omega,x$rho,x$r1,x$c1,x$w1,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma1,l$B$B1[t], l$qhat$est$mu[t]) ## ??????????????????
-  # l$qstar$qstar2[t] <- getSigmaStar(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t],x$Y,x$gamma2,l$B$B2[t], l$qhat$est$mu[t]) ## ??????????????????
-  
   ## LEARN Qhat
   if(learn) {
     data <- list(G=l$G$G1[t][[1]],  L=l$L$L1[t], 
@@ -525,18 +516,6 @@ playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
     x$n.iter <- getNIterRafDiag(l$qhat$mcmc[[t]], q = .025, r=.01, s=0.95)    
   }
   
-  
-  ## TEST LEARNING VIA AUTOCORRELATION
-  # l$h$h1[t] <- x$ep * ( sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
-  # l$h$h2[t] <- x$ep * ( sum(sapply(seq_len(t), function(ii)length(l$z[[ii]])))  - sum( sapply(seq_len(t),function(ii)sum(l$z[[ii]])) ) )
-  # ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=T, type='Ljung-Box')
-  # if ( ac > x$learningThreshold) {
-  #   l$h$h1[t] <- x$ep *  sum(l$z[[t]]) 
-  #   l$h$h2[t] <- x$ep * ( length(l$z[[t]]) -  sum(l$z[[t]]) )
-  # } else {
-  #   l$h$h1[t] <- 0
-  #   l$h$h2[t] <- 0
-  # }
   ## USE CHI_SQUARE STATISTIC FROM AUTOCORR TEST TO DOWNWEIGHT EVIDENCE LEARNED FROM THIS PERIOD MCMC
   if(x$downweight & learn) {
     ac <- autocorrTestMcmc(l$qhat$mcmc[[t]], nlags=20, pvalOnly=F, type='Ljung-Box')
@@ -547,7 +526,6 @@ playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
     l$h$h2[t] <- x$a2 + ( length(l$z[[t]]) - sum(l$z[[t]]) )
   }
   
-  
   #### OUTCOME2
   ## Quantity
   l$Q$Q1[t] <- getQty(x$Y, l$p$p1[t], l$B$B1[t]*(1-x$db1), sum(l$G$G1[[t]]))
@@ -556,40 +534,12 @@ playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
   l$Pi$Pi1[t] <- getPi(x$r1,x$w1,l$psi$psi1[t],x$rho,x$c1,l$Q$Q1[t], l$O$O1[t], x$Y)
   l$Pi$Pi2[t] <- getPi(x$r2,x$w2,l$psi$psi2[t],x$rho,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
   
-  
-  
-  
   #---------------------------------- MAIN GAME LOOP ----------------------------------------------
   
   for (t in 2:x$Tau)
   {
     if(verbose)
       cat(paste0('\nt: ',t,'\n'))
-    
-    ## STRATEGY DECISION VARIABLES
-    # l$qstar$qstar1[t] <- getSigmaStar(x$omega,x$rho,x$r1,x$c1,x$w1,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma1,l$B$B1[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
-    # l$qstar$qstar2[t] <- getSigmaStar(x$omega,x$rho,x$r2,x$c2,x$w2,x$v1,x$v2,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],x$Y,x$gamma2,l$B$B2[t-1], l$qhat$est$mu[t-1]) ## ??????????????????
-    l$qstar$qstar1[t] <-  ifelse(l$sig$sig2[t]==0,
-                                 getQstarSig20(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B1[t-1]),
-                                 getQstarSig21(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B1[t-1])
-    )
-    l$qstar$qstar2[t] <- ifelse(l$sig$sig2[t]==1,
-                                getQstarSig20(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B2[t-1]),
-                                getQstarSig21(x,l$p$p1[t-1],l$p$p2[t-1],l$J$J1[t-1],l$J$J2[t-1],l$B$B2[t-1])
-    )
-    ## CSR STRATEGIES
-    if(!is.na(x$sig1.fixed[t])) { ## FIXED STRATEGY 
-      l$sig$sig1[t] <- ifelse(!is.na(x$sig1.fixed[t]), x$sig1.fixed[t],  l$sig$sig1[t-1])
-    } else {                     ## BAYES LEARNED STRATEGY
-      l$sig$sig1[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
-    }
-    
-    if(!is.na(x$sig2.fixed[t])) { ## FIXED STRATEGY 
-      l$sig$sig2[t] <- ifelse(!is.na(x$sig2.fixed[t]), x$sig2.fixed[t],  l$sig$sig2[t-1])
-    } else {                     ## BAYES LEARNED STRATEGY
-      l$sig$sig2[t] <- ifelse(t<4,0,1) ##ifelse(l$qhat$est$mu[t-1] > l$qstar$qstar1[t], 1, 0)
-    }
-    
     ## UPDATE STRATEGY CHANGES
     if(l$sig$sig1[t] != l$sig$sig1[t-1] )
       x$t1.change <- c(x$t1.change, t)

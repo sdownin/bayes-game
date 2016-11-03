@@ -6,10 +6,38 @@ library(lattice)
 library(latticeExtra)
 library(plyr)
 library(parallel)
+library(R6)
 
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 
 #--------------------------- FUNCTIONS -----------------------------------------
+
+BaseGame <- R6Class("BaseGame",
+  public = list(
+    name = NA,
+    l = list(),
+    initialize = function(...) {
+      for (item in list(...)) {
+        self$add(item)
+      }
+    },
+    add = function(x){
+      self$l <- c(self$l, x)
+      invisible(self)
+    }
+  )
+)
+
+BVWG <- R6Class("BWVG",
+  inherit = BaseGame,
+  public = list(
+    initialize = function(...) {
+      for (item in list(...)) {
+        self$add(item)
+      }
+    }
+  )
+)
 
 ##
 # 
@@ -225,25 +253,67 @@ varBeta <- function(a,b)
   return(num/denom)
 }
 
+# ##
+# #
+# #
+# ##
+# getModelstring <- function(sig1,sig2)
+# {
+#   paste0("model{
+#          for (i in 1:n) {
+#          z[i] ~ dbern(q)
+#          th1[i] <- p2*(v1 + omega*sig1*z[i])
+#          th2[i] <- p1*(v2 + omega*sig2*z[i])
+#          s[i] <- ",ifelse(sig2 > sig1,
+#                           "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
+#                           "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
+#          ),"
+#       G[i] ~ dbinom(s[i],L)
+# }
+# q ~ dbeta(h1t,h2t)
+# }")
+# }
+
 ##
 #
 #
 ##
 getModelstring <- function(sig1,sig2)
 {
-  paste0("model{
-         for (i in 1:n) {
-         z[i] ~ dbern(q)
-         th1[i] <- p2*(v1 + omega*sig1*z[i])
-         th2[i] <- p1*(v2 + omega*sig2*z[i])
-         s[i] <- ",ifelse(sig2 > sig1,
-                          "((th2[i]/th1[i])*pow(J2, rho)) / ( pow(J1, rho) + (th2[i]/th1[i])*pow(J2, rho) )",
-                          "((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )"
-         ),"
-      G[i] ~ dbinom(s[i],L)
+  sprintf("
+    model{
+       for (i in 1:n) {
+          z[i] ~ dbern(q)
+          th1[i] <- p2*(v1 + omega*sig1*z[i])
+          th2[i] <- p1*(v2 + omega*sig2*z[i])
+          s[i] <- ((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )
+          G[i] ~ dbinom(s[i],L)
+        }
+      q ~ dbeta(h1t,h2t)
+    }
+  ")
 }
-q ~ dbeta(h1t,h2t)
-}")
+
+##
+#
+#
+##
+getModelstring2 <- function()
+{
+  sprintf("
+          model{
+          for (i in 1:n) {
+          z[i] ~ dbern(q)
+          th1[i] <- p2*(v1 + omega*sig1*z[i])
+          th2[i] <- p1*(v2 + omega*sig2*z[i])
+          s[i] <- ((th1[i]/th2[i])*pow(J1, rho)) / ( (th1[i]/th2[i])*pow(J1, rho) + pow(J2, rho) )
+          G[i] ~ dbinom(s[i],L)
+          }
+          q ~ dbeta(h1t,h2t)
+          rho ~ dnorm(mu,tau)
+          mu
+          }
+          ")
 }
 
 ##

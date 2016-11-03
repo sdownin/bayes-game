@@ -196,40 +196,134 @@ ggsave('demand_by_q_z_facets_ribbon_ggplot_12.png', height=3.5,width=7.5,units='
 # sq <- getMaxPsi(omegavec,x$rho,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t])
 # plot(sq ~ omegavec, ylim=c(0,.021), type='o',pch=16,xlab=expression(omega),ylab=expression(psi[1]))
 # abline(h=psibar, lty=2)
+x <- list(
+  v1= 1
+  , v2=1
+  , db1=.5  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db2=.5  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , dj1=.1
+  , dj2=.1
+  , c1=.5       ## seller MARGINAL cost
+  , c2=.5       ## seller MARGINAL cost
+  , gamma1=.05  ## seller CSR cost
+  , gamma2=.05  ## seller CSR cost
+  , w1=.02      ## Platform operator MARGINAL cost
+  , w2=.02      ## Platform operator MARGINAL cost
+  , psi1=.03    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
+  , psi2=.03    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
+  , a1=1
+  , a2=1
+  , r1=.1
+  , r2=.1
+  , omega=1.5
+  , rho=.8
+  , growth=.01
+  , Y=1000
+  , ep=1e-1
+  , N0=500
+  , Tau=100
+  , probs=c(.005,.025,.5,.975,.995)
+  , learningThreshold=.05
+  , n.iter=1000
+  , downweight=TRUE
+  , q=.4
+  , sig1.fixed=NA
+  , sig2.fixed=NA
+  , t1.change=NA
+  , t2.change=NA
+)
 
-omegavec <- 2^seq(-5,5)
-psibar <- x$r1*l$p$p1[t]-x$w1
+## MAIN GAME CALL
+## SET STRATEGY
+x$t1.change <- 1
+x$t2.change <- 10
+x$sig1.fixed <- c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change))
+x$sig2.fixed <- c(rep(0,x$t2.change),rep(0,x$Tau-x$t2.change))
+## RUN
+l <- playCsrBayesGame(x, learn=FALSE)
+## SAVE OBJECT
+dput(x = l, file = 'l_list_for_pooling_separating_plot.RData')
+# l <- dget('l_list_for_pooling_separating_plot.RData')
+
+### LOG LOG
+omegavec <- 2^seq(-5,7)
 rhovec <- c(0,1,2,3)
-sq <- sapply(rhovec,function(r)getMaxPsi(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
-file.title <- sprintf('psi_func_omega_LnLn2_pool_sep_J1_J2_biplot_p1_%s_p2_%s.png',l$p$p1[t],l$p$p2[t])
+file.title <- sprintf('psi_func_omega_LnLn_pool_sep3_J1_J2_biplot_p1_%s_p2_%s.png',getPrice(1,x),getPrice(1,x))
 png(file.path(getwd(),'img',file.title),height=4.5,width=9,units='in',res=250)
   par(mfrow=c(1,2),mar=c(4.1,4.4,3,1.5))
   t <- 8
-  sq <- sapply(rhovec,function(r)getMaxPsi(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
-  matplot(x= omegavec, y=sq,log='xy',type='o',col='black',pch=17:20,
-          xlab=expression('CSR Response'~ln(omega)),
-          ylab=expression('CSR Cost'~ln(psi[1])), 
-          main=expression('Sellers Ratio '~J[1]/J[2]~'='), cex=2)
+  psibar <- getMaxPsi(1, x)
+  sq <- sapply(rhovec,function(r)getPlatformCsrCostPoolSepEq(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
+  matplot(x= omegavec, y=sq,
+          log='xy',
+          type='o',col='black',pch=17:20,
+          xlab=expression('CSR Response:'~ln(omega)),
+          ylab=expression('CSR Cost:'~ln(psi[1])), 
+          main=expression('Sellers Ratio: '~J[1]/J[2]~'='), cex=1)
   legend('bottomright',title=expression(tilde(rho)),legend=rhovec,col='black',lty=1:4,pch=17:20)
   mtext(expression(bar(psi[1])),side=2,at = psibar, line=2.5, col='darkred')
-  mtext(expression(Pooling:~sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=6,line=-9,col='darkblue')
-  mtext(expression(Separating:~sigma[1]!=sigma[2]),side=3,at=.2,line=-2,col='darkblue')
-  mtext(sprintf('%.1f',l$J$J1[t]/l$J$J2[t]),side=3,at=10,line=1)
+  mtext(expression(sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=10,line=-9,col='darkblue')
+  mtext(expression(sigma[1]!=sigma[2]),side=3,at=.2,line=-2.5,col='darkblue')
+  mtext(sprintf('%.1f',l$J$J1[t]/l$J$J2[t]),side=3,at=44,line=1,cex=1.2)
   abline(h=c(0,psibar), lty=2, col='darkred')
   #
   t <- 140
-  sq <- sapply(rhovec,function(r)getMaxPsi(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
-  matplot(x= omegavec, y=sq,log='xy',type='o',col='black',pch=17:20,
-          xlab=expression('CSR Response'~ln(omega)),
-          ylab=expression('CSR Cost'~ln(psi[1])), 
-          main=expression('Sellers Ratio '~J[1]/J[2]~'='), cex=2)
+  psibar <- getMaxPsi(1, x)
+  sq <- sapply(rhovec,function(r)getPlatformCsrCostPoolSepEq(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
+  matplot(x= omegavec, y=sq,
+          log='xy',
+          type='o',col='black',pch=17:20,
+          xlab=expression('CSR Response:'~ln(omega)),
+          ylab=expression('CSR Cost:'~ln(psi[1])), 
+          main=expression('Sellers Ratio: '~J[1]/J[2]~'='), cex=1)
   legend('bottomright',title=expression(tilde(rho)),legend=rhovec,col='black',lty=1:4,pch=17:20)
   mtext(expression(bar(psi[1])),side=2,at = psibar, line=2.5, col='darkred')
-  mtext(expression(Pooling:~sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=6,line=-9,col='darkblue')
-  mtext(expression(Separating:~sigma[1]!=sigma[2]),side=3,at=.2,line=-2,col='darkblue')
-  mtext(sprintf('%.1f',l$J$J1[t]/l$J$J2[t]),side=3,at=10,line=1)
+  mtext(expression(sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=10,line=-9,col='darkblue')
+  mtext(expression(sigma[1]!=sigma[2]),side=3,at=.2,line=-2.5,col='darkblue')
+  mtext(sprintf('%.1f',l$J$J1[t]/l$J$J2[t]),side=3,at=44,line=1,cex=1.2)
   abline(h=c(0,psibar), lty=2, col='darkred')
 dev.off()
+
+## NOT LOG
+
+omegavec <- 2^seq(-5,5)
+rhovec <- c(0,1,2,3)
+file.title <- sprintf('psi_func_omega_pool_sep3_J1_J2_biplot_p1_%s_p2_%s.png',getPrice(1,x),getPrice(1,x))
+png(file.path(getwd(),'img',file.title),height=4.5,width=9,units='in',res=250)
+  par(mfrow=c(1,2),mar=c(4.1,4.4,3,1.5))
+  t <- 8
+  psibar <- getMaxPsi(1, x)
+  sq <- sapply(rhovec,function(r)getPlatformCsrCostPoolSepEq(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
+  matplot(x= omegavec, y=sq,
+          ylim=c(0,psibar*1.01),log='',
+          type='o',col='black',pch=17:20,
+          xlab=expression('CSR Response'~(omega)),
+          ylab=expression('CSR Cost'~(psi[1])), 
+          main=expression('Sellers Ratio: '~J[1]/J[2]~'='), cex=1)
+  legend('bottomright',title=expression(tilde(rho)),legend=rhovec,col='black',lty=1:4,pch=17:20)
+  mtext(expression(bar(psi[1])),side=2,at = psibar, line=1, col='darkred')
+  mtext(expression(sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=16,line=-13,col='darkblue')
+  mtext(expression(sigma[1]!=sigma[2]),side=3,at=3,line=-2.5,col='darkblue')
+  mtext(sprintf('%.1f',l$J$J1[t]/l$J$J2[t]),side=3,at=28,line=1,cex=1.2)
+  abline(h=c(psibar), lty=2, col='darkred')
+  #
+  t <- 140
+  psibar <- getMaxPsi(1, x)
+  sq <- sapply(rhovec,function(r)getPlatformCsrCostPoolSepEq(omegavec,r,x,l$p$p1[t],l$p$p2[t],l$J$J1[t],l$J$J2[t]))
+  matplot(x= omegavec, y=sq,
+          ylim=c(0,psibar*1.01),log='',
+          type='o',col='black',pch=17:20,
+          xlab=expression('CSR Response'~(omega)),
+          ylab=expression('CSR Cost'~(psi[1])), 
+          main=expression('Sellers Ratio: '~J[1]/J[2]~'='), cex=1)
+  legend('bottomright',title=expression(tilde(rho)),legend=rhovec,col='black',lty=1:4,pch=17:20)
+  mtext(expression(bar(psi[1])),side=2,at = psibar, line=1, col='darkred')
+  mtext(expression(sigma[1]*' = '*sigma[2]*' = 1'),side=3,at=16,line=-13,col='darkblue')
+  mtext(expression(sigma[1]!=sigma[2]),side=3,at=3,line=-2.5,col='darkblue')
+  mtext(sprintf('%.1f',l$J$J1[t]/l$J$J2[t]),side=3,at=28,line=1,cex=1.2)
+  abline(h=c(psibar), lty=2, col='darkred')
+dev.off()
+
 
 #------------------------------------------------------------------------
 ## JAGS MODEL  

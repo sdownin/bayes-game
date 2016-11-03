@@ -2,41 +2,10 @@
 #   CSR BAYES GAME TESTING RUNS
 #
 ##
-
-#   v1=1
-# , v2=1
-# , db1=.3  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-# , db2=.3  # 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-# , dj1=.05
-# , dj2=.05
-# , c1=.5       ## seller MARGINAL cost
-# , c2=.5       ## seller MARGINAL cost
-# , gamma1=.05  ## seller CSR cost
-# , gamma2=.05  ## seller CSR cost
-# , w1=.01      ## Platform operator MARGINAL cost
-# , w2=.01      ## Platform operator MARGINAL cost
-# , psi1=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
-# , psi2=.01    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
-# , a1=1
-# , a2=1
-# , r1=.1
-# , r2=.1
-# , omega=1.5
-# , rho=1.05
-# , growth=.01
-# , Y=1000
-# , ep=1e-1
-# , N0=500
-# , Tau=10
-# , probs=c(.005,.025,.5,.975,.995)
-# , learningThreshold=.05
-# , downweight=TRUE
-# , q=.3
 ##
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
-source(file.path(getwd(),'R','csr_bayes_game_functions.R'))
+source(file.path(getwd(),'R','bvwg_functions.R'))
 library(fields)
-
 
 ##  RUN MAIN GAME SIMULATION
 ##  USING GAME SETUP LIST X
@@ -89,7 +58,7 @@ l <- playCsrBayesGame(x, learn=TRUE)
 ## OUTPUT
 print(l$sig)
 getCsrBayesGameSummaryPlots(x,l)
-matplot(l$qstar[-1,],type='o',pch=16, main=expression(q^"*"))
+#matplot(l$qstar[-1,],type='o',pch=16, main=expression(q^"*"))
 
 
 ## PLOT GAME SUMMARY FOR GAME WITH CSR BREAKPOINT (START CSR AT t_star)
