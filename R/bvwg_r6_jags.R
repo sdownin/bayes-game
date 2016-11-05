@@ -4,6 +4,7 @@ library(RColorBrewer)
 library(MASS)
 library(rjags)
 library(R6)
+library(psych)
 
 #######################
 ## EXAMPLE
@@ -27,25 +28,31 @@ library(R6)
 # jg$bivarPlot('q','epsilon')
 ######################
 
-JAGS <- R6Class("JAGS",
+JAGS <- R6Class(
+  "JAGS",
   public = list(
+    probs = c(.005,.025,.5,.975,.995),
     modelString = NA,
     params = NA,
     config = list(n.chains=3,n.adapt=2400,n.iter.update=2400,n.iter.samples=2400, thin=3,seed=1111),
-    mcmc = NA,
-    l = list(),
+    mcmc = list(),
+    est = list(),
     
-    initialize = function(modelString=NA,params=NA,n.chains=3,config=NA,l=list()) {
+    initialize = function(modelString=NA,params=NA,n.chains=3,...) {
       self$modelString <- modelString
       self$params <- params
-      if (any(!is.na(config))) {
-        for (item in config) {self$config[[item]] <- config[[item]]  }
+      self$config$n.chains <- n.chains
+      items <- list(...)
+      for (item in names(items)){
+        if (item %in% names(self$config)) 
+          self$config[[item]] <- items[[item]]
+        else
+          self$addConfig(items[item])
       }
-      self$add(l)
     },
     
-    add = function(l) {
-      self$l <- c(self$l, l)
+    addConfig= function(l) {
+      self$config <- c(self$config, l)
     },
     
     run = function(data, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
@@ -54,6 +61,8 @@ JAGS <- R6Class("JAGS",
       update(model, n.iter=self$config$n.iter.update)
       self$mcmc <- coda.samples(model=model, variable.names=self$params, n.iter=self$config$n.iter.samples, thin=self$config$thin)
       print(summary(self$mcmc))
+      self$setEst()
+      
       if (getNIter)
         self$config$n.iter <- self$getNIterRafDiag(self$mcmc) 
       if (runDiag) 
@@ -95,20 +104,53 @@ JAGS <- R6Class("JAGS",
       mcmcplots::autplot1(mcmc.output, chain=n.chains,style = 'plain') #, main=sprintf("Autocorrelation of %s (t=%s)",param,period))
     },
     
-    bivarPlot = function(varx, vary, chain=1) {
+    bivarPlot = function(varx, vary, chain=NA, cor.title=TRUE, padx=0, pady=.1) {
       if (length(self$mcmc) > 0) {
-        x <- as.vector(self$mcmc[[chain]][, varx])
-        y <- as.vector(self$mcmc[[chain]][, vary])
+        if(is.na(chain) | chain=='all') {
+          x <- as.vector(unlist(sapply(self$mcmc,function(x)x[, varx])))
+          y <- as.vector(unlist(sapply(self$mcmc,function(x)x[, vary])))
+        } else {
+          x <- as.vector(self$mcmc[[chain]][, varx])
+          y <- as.vector(self$mcmc[[chain]][, vary])          
+        }
         # density config
         kde <- kde2d(x, y, n=50)
-        k <- 11
+        k <- 10
         my.cols <- rev(brewer.pal(k, "RdYlBu"))
+        #
+        main <- ''
+        if(cor.title) {
+          tmp <- cor.test(x,y)[c('estimate','p.value')]
+          if(tmp$p.value < 0.001) 
+            main <- sprintf('Corr: %.3f (p.val < 0.001)',tmp$estimate)
+          else
+            main <- sprintf('Corr: %.3f (p.val = %.3f)',tmp$estimate, tmp$p.value)
+        } 
         # plot
         par(mfrow=c(1,1), mar=c(4.1,4.1,1,1))
-        plot(x, y, xlab=varx, ylab=vary, col=rgb(.3,.3,.3,.6), pch=16)
+        xlim <- c(min(x)/(1+padx), max(x)*(1+padx))
+        ylim <- c(min(y)/(1+pady), max(y)*(1+pady))
+        plot(x, y, xlab=varx, ylab=vary, main=main, col=rgb(.3,.3,.3,.6), pch=16, xlim=xlim, ylim=ylim) 
         abline(v=mean(x),lty=2,col=rgb(.1,.1,.1,.4)); abline(h=mean(y),lty=2,col=rgb(.1,.1,.1,.4))
         contour(kde, drawlabels=FALSE, nlevels=k, col=my.cols, add=TRUE,lwd=2)
       }
+    },
+    
+    setEst = function(mcmc.output=NA, probs=NA, burninProportion=.2) {
+      mcmc.output <- ifelse(is.na(mcmc.output), self$mcmc, mcmc.output)
+      if(all(is.na(mcmc.output))) stop('mcmc.output must be already set or provided as argument')
+      for (param in self$params) {
+        samps <- unlist(sapply(mcmc.output,function(x){
+          len <- nrow(x)
+          burn <- ceiling(burninProportion*len)
+          x[burn:len, param]
+        }))
+        self$est[[param]] <- quantile(samps, self$probs)
+      }
+    },
+    
+    getEst = function() {
+      return(self$est)
     }
   )
 )

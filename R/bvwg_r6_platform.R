@@ -25,67 +25,59 @@ library(R6)
 #----------------------
 
 PLATFORM <- R6Class("PLATFORM", 
-  public = list(
-    name = NA,
-    l = list(sig=c(0)   #0=No CSR
-      , J = c(10)       #sellers
-      , B = c(100)      #buyers
-      , v= 1            #utilitarian value
-      , db=.5  # 30% buy all (y/pk) goods from current platform 1; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
-      , dj=.1
-      , c=.5       ## seller MARGINAL cost
-      , gamma=.05  ## seller CSR cost
-      , w=.02      ## Platform operator MARGINAL cost
-      , psi=.02    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
-      , a=1
-      , r=.1
-    ),
-    initialize = function(name=NA, l=list()) {
-      self$name <- name
-      self$add(l)
-    },
-    
-    add = function(l) {
-      self$l <- c(self$l, l)
-    },
-    
-    set = function(item, val) {
-      self$l[[item]] <- val
-    },
-    
-    trans = function() {
-      
-    },
-    
-    getGrowingVector = function(N0,Tau,growth)  {
-      out <- lapply(seq(0,Tau-1),function(t){
-        n <- ceiling(N0*(1+growth)^t)
-        return(rep(NA,n))
-      })
-      return(out)
-    },
-    
-    getPsi = function(gamma,y,p,B)
-    {
-      return(gamma / ((y/p)*B))
-    },
-    
-    getB = function(s,m,b,d)  {
-      newB <- s*m + b*(1-d)
-      return(ifelse(newB > 0, newB, 0))
-    },
-    
-    getJ = function(y,rho,gamma,c,B,f,J,dj)  {
-      netMargProfit <- ((rho+1)/rho) - (gamma/(rho*c))
-      newJ <- y*netMargProfit*(B/f) + J*(1-dj)
-      return(ifelse(newJ > 0, newJ, 0))
-    },
-    
-    getG = function(s,L,M,seed=1111)  {
-      set.seed(seed)
-      size <- min(M, length(s))
-      s.sample <- sample(s,size,replace = F)
-      return( sapply(s.sample, function(s)rbinom(n=1, size = L, s)) )
+                    public = list(
+                      name = NA,
+                      l = list(
+                        sig = c(0)   #0=No CSR
+                        , J = c(10)       #sellers
+                        , B = c(100)      #buyers
+                        , v= 1            #utilitarian value
+                        , db=.5  # 50% buy all (y/pk) goods from current platform 1; 50% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+                        , dj=.1
+                        , c=.5       ## seller MARGINAL cost
+                        , gamma=.05  ## seller CSR cost
+                        , w=.02      ## Platform operator MARGINAL cost
+                        , psi=.02    ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
+                        , a=1
+                        , r=.1
+                      ),
+                      initialize = function(name=NA, l=list()) {
+                        self$name <- name
+                        self$add(l)
+                      },
+                      
+                      add = function(l) {
+                        self$l <- c(self$l, l)
+                      },
+                      
+                      set = function(item, val) {
+                        self$l[[item]] <- val
+                      },
+                      
+                      trans = function() {
+                        
+                      },
+                      
+                      getPsi = function(gamma,y,p,B) {
+                        return(gamma / ((y/p)*B))
+                      },
+                      
+                      getB = function(s,m,b,d)  {
+                        newB <- s*m + b*(1-d)
+                        return(ifelse(newB > 0, newB, 0))
+                      },
+                      
+                      getJ = function(y,rho,gamma,c,B,f,J,dj)  {
+                        netMargProfit <- ((rho+1)/rho) - (gamma/(rho*c))
+                        newJ <- y*netMargProfit*(B/f) + J*(1-dj)
+                        return(ifelse(newJ > 0, newJ, 0))
+                      },
+                      
+                      getG = function(s,L,M,seed=1111)  {
+                        set.seed(seed)
+                        size <- min(M, length(s))
+                        s.sample <- sample(s,size,replace = F)
+                        return( sapply(s.sample, function(s)rbinom(n=1, size = L, s)) )
     },
     
     getQty = function(y,p,netB,G) {
