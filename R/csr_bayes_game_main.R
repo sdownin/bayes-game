@@ -30,6 +30,7 @@ initCsrBayesGameConfig <- function(x)
         , h=data.frame(h1=rep(0,x$Tau),h2=rep(0,x$Tau))
         , shape=rep(0,x$Tau)
         , rate=rep(0,x$Tau)
+        , s.diff=rep(0,x$Tau)
         , sig=data.frame(sig1=x$sig1, sig2=x$sig2)
         , Q=data.frame(Q1=rep(0,x$Tau),Q2=rep(0,x$Tau))
         , Pi=data.frame(Pi1=rep(0,x$Tau),Pi2=rep(0,x$Tau))
@@ -48,7 +49,7 @@ initCsrBayesGameConfig <- function(x)
 playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
 {
   l <- initCsrBayesGameConfig(x)
-  t <- 1
+  t <- x$t
   #--------------------------------- INITIAL PERIOD ------------------------------------------
   ## TEMP VALUES TO BE REPLACED BY LEARNING AFTER INITAL PERIOD
   l$est[t, ] <- quantile(rbeta(1e4, x$a1, x$a2), probs = x$probs)
@@ -134,13 +135,19 @@ getModelStr <- function() {
 ##
 learnBayesParams <- function(x,l,t)
 { 
-  s.diff <- mean(l$s.base) - mean(l$s[[t]])
+  l$s.diff[t] <- mean(l$s[[t]]) - mean(l$s.base)
   s.cumu <- sum(unlist(l$G$G1)) / sum(unlist(c(l$G$G1,l$G$G2)))
-  l$h$h1[t] = ifelse(t==1,x$a1,l$h$h1[t-1]) + ifelse(s.diff > 0, 1, 0)
-  l$h$h2[t] = ifelse(t==1,x$a2,l$h$h2[t-1]) + ifelse(s.diff > 0, 1, 0)
-  l$shape[t] = ifelse(t==1,1,l$shape[t-1])  + 1-s.cumu
-  l$rate[t] = ifelse(t==1,1,l$rate[t-1])    + s.cumu
-  ##
+  ## LEARNING HERE ...
+  # l$h$h1[t] = ifelse(t==1,x$a1,l$h$h1[t-1]) + ifelse( l$s.diff[t] > 0, 1, 0)
+  # l$h$h2[t] = ifelse(t==1,x$a2,l$h$h2[t-1]) + ifelse( l$s.diff[t] < 0, 1, 0)
+  # l$shape[t] = ifelse(t==1,1,l$shape[t-1])  + 1-s.cumu
+  # l$rate[t] = ifelse(t==1,1,l$rate[t-1])    + s.cumu
+  ## NOT LEARNING HERE ...
+  l$h$h1[t] = ifelse(t==1,x$a1,l$h$h1[t-1]) 
+  l$h$h2[t] = ifelse(t==1,x$a2,l$h$h2[t-1]) 
+  l$shape[t] = ifelse(t==1,1,l$shape[t-1])  
+  l$rate[t] = ifelse(t==1,1,l$rate[t-1])  
+  ## -----------------
   data <- list(G=l$G$G1[t][[1]],  
                L=l$L$L1[t], 
                n=l$M[t]-1,  ## NO Z HERE

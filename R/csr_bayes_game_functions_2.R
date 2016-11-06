@@ -13,6 +13,35 @@ setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differe
 
 #--------------------------- FUNCTIONS -----------------------------------------
 ##
+#
+##
+persp.withcol <- function(x,y,z,pal,nb.col,...,xlg=TRUE,ylg=TRUE)
+{
+  colnames(z) <- y
+  rownames(z) <- x
+  
+  nrz <- nrow(z)
+  ncz <- ncol(z) 
+  
+  color <- pal(nb.col)
+  zfacet <- z[-1, -1] + z[-1, -ncz] + z[-nrz, -1] + z[-nrz, -ncz]
+  facetcol <- cut(zfacet, nb.col)
+  par(xlog=xlg,ylog=ylg)
+  
+  xname <- deparse(substitute(x))
+  yname <- deparse(substitute(y))
+  s <- as.matrix(z)
+  
+  per <- persp(
+    as.numeric(rownames(z)),
+    as.numeric(colnames(z)),
+    s,
+    xlab=xname,ylab=yname,
+    col=color[facetcol],
+    ...
+  )
+}
+##
 # 
 # @argument x [list]; x$z can be n-length vector of {1,0}
 # @returns [vector]  demand share for each x$z
@@ -187,7 +216,8 @@ getB <- function(s,m,b,d)
 ##
 getJ <- function(y,epsilon,gamma,c,B,f,J,dj)
 {
-  netMargProfit <- ((epsilon+1)/epsilon) - (gamma/(epsilon*c))
+  net.eff <- epsilon + 1
+  netMargProfit <- ((net.eff + 1)/net.eff) - (gamma/(net.eff*c))    
   newJ <- y*netMargProfit*(B/f) + J*(1-dj)
   return(ifelse(newJ > 0, newJ, 0))
 }
