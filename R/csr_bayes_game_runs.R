@@ -17,7 +17,7 @@ Tau <- 10                       # number of periods
 x <- list(t=1
   , q= .27           # focal parameter
   , epsilon = 1.5    # focal parameter
-  , params=c('q')
+  , params=c('q', 'epsilon')
   , J1.0=8, J2.0=24  # secondary focal param
   , p1.0=1, p2.0=1
   , v1= 1, v2=1

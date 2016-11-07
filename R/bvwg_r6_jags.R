@@ -81,11 +81,11 @@ JAGS <- R6Class(
     },
     
     ##------------
-    run =  function(data, parallel=T, envir=NA, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
+    run =  function(data, inits=NA, parallel=T, envir=NA, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
       if (parallel)
         self$mcmc <- self$.runMcmcParallel(data, envir)
       else
-        self$mcmc <- self$.runMcmc(data)
+        self$mcmc <- self$.runMcmc(data, inits)
       print(summary(self$mcmc))
       self$setEst()
       if (getNIter)
@@ -104,8 +104,8 @@ JAGS <- R6Class(
         return(self$mcmc)
     }, 
     
-    .runMcmc = function(data)  {
-      model <- jags.model(textConnection(self$modelstring), data=data, n.adapt=self$config$n.adapt, n.chains=self$config$n.chains )
+    .runMcmc = function(data, inits)  {
+      model <- jags.model(textConnection(self$modelstring), data=data, inits=inits, n.adapt=self$config$n.adapt, n.chains=self$config$n.chains )
       set.seed(self$seed)
       update(model, n.iter=self$config$n.iter.update)
       mcmc.output <- coda.samples(model=model, variable.names=self$params, n.iter=self$config$n.iter.samples, thin=self$config$thin)

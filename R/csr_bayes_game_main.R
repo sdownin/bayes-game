@@ -134,17 +134,15 @@ initCsrBayesGameConfig <- function(x)
         , s=list() 
         , G=list(G1=list(),G2=list())
         , modelstring=ifelse('epsilon'%in%x$params,getModelStr.qepsilon(), getModelStr())
+        , t=x$t
   )
   
-  l$param.inits <- list()
+  t <- l$t
+  
   for (param in x$params) {
-    l$param.inits[[param]] <- ifelse(param=='q',runif(1),ifelse(param=='epsilon',rgamma(1,1,1),rnorm(1)))
     l$est[[param]] <- data.frame( L99=rep(0,x$Tau),L95=rep(0,x$Tau), mu=rep(0,x$Tau), U95=rep(0,x$Tau),U99=rep(0,x$Tau) )
     l$est[[param]][t, ] <- quantile(rbeta(1e4, x$a1, x$a2), probs = x$probs)
   }
-
-  ## TEMP VALUES TO BE REPLACED BY LEARNING AFTER INITAL PERIOD
-  l$mcmc[[t]] <- NA
   
   ## Initial values
   l$J$J1[t] <- x$J1.0
@@ -189,7 +187,7 @@ initCsrBayesGameConfig <- function(x)
 playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
 {
   l <- initCsrBayesGameConfig(x)
-  t <- x$t
+  t <- l$t
   #--------------------------------- INITIAL PERIOD ------------------------------------------
   ## LEARN Qhat
   if(learn) {
@@ -216,6 +214,7 @@ playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
   #---------------------------------- MAIN GAME LOOP ------------------------------
   if (x$Tau > 1) {
     for (t in 2:x$Tau) {
+      l$t <- t
       if(verbose) cat(paste0('\nt: ',t,'\n'))
       l <- updateGame(l, t)
     }    
@@ -281,12 +280,17 @@ learnBayesParams <- function(x,l,t)
                ratet=l$rate[t] )
   if ( !('epsilon' %in% x$params) ) data$epsilon <- l$epsilon.true
   if ( !('q' %in% x$params)       ) data$q <- l$q.true
+  ##
+  l$param.inits <- list()
+  for (param in x$params) {
+    l$param.inits[[param]] <- ifelse(param=='q',rbeta(1,l$h$h1[t],l$h$h2[t]),ifelse(param=='epsilon',rgamma(1,1,1),rnorm(1)))
+  }
   ## JAGS object if not parallel or MCMC object if parallel
   if(x$parallel) {
     l$sim[[t]] <- runMcmcPar(l,x,t)
   } else {
     l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter.update=x$n.iter)
-    l$sim[[t]]$run(data, parallel = F, envir=environment(), period=t)       
+    l$sim[[t]]$run(data, l$param.inits, parallel = F, envir=environment(), period=t)       
   }
 
   # if ( !x$parallel & length(x$params) > 1) {
