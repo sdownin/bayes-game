@@ -31,6 +31,8 @@ initCsrBayesGameConfig <- function(x)
         , shape=rep(0,x$Tau)
         , rate=rep(0,x$Tau)
         , s.diff=rep(0,x$Tau)
+        , q.hat=rep(NA,x$Tau)
+        , bss=rep(NA,x$Tau)
         , sig=data.frame(sig1=x$sig1, sig2=x$sig2)
         , Q=data.frame(Q1=rep(0,x$Tau),Q2=rep(0,x$Tau))
         , Pi=data.frame(Pi1=rep(0,x$Tau),Pi2=rep(0,x$Tau))
@@ -104,9 +106,11 @@ playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
   l$Pi$Pi2[t] <- getPi(x$r2,x$w2,l$psi$psi2[t],x$epsilon,x$c2,l$Q$Q2[t], l$O$O2[t], x$Y)
   
   #---------------------------------- MAIN GAME LOOP ------------------------------
-  for (t in 2:x$Tau) {
-    if(verbose) cat(paste0('\nt: ',t,'\n'))
-    l <- updateGame(l, t)
+  if (x$Tau > 1) {
+    for (t in 2:x$Tau) {
+      if(verbose) cat(paste0('\nt: ',t,'\n'))
+      l <- updateGame(l, t)
+    }    
   }
   #--------------------------------- END MAIN GAME LOOP ---------------------------
   return(l)
@@ -137,16 +141,27 @@ learnBayesParams <- function(x,l,t)
 { 
   l$s.diff[t] <- mean(l$s[[t]]) - mean(l$s.base)
   s.cumu <- sum(unlist(l$G$G1)) / sum(unlist(c(l$G$G1,l$G$G2)))
-  ## LEARNING HERE ...
-  # l$h$h1[t] = ifelse(t==1,x$a1,l$h$h1[t-1]) + ifelse( l$s.diff[t] > 0, 1, 0)
-  # l$h$h2[t] = ifelse(t==1,x$a2,l$h$h2[t-1]) + ifelse( l$s.diff[t] < 0, 1, 0)
-  # l$shape[t] = ifelse(t==1,1,l$shape[t-1])  + 1-s.cumu
-  # l$rate[t] = ifelse(t==1,1,l$rate[t-1])    + s.cumu
-  ## NOT LEARNING HERE ...
-  l$h$h1[t] = ifelse(t==1,x$a1,l$h$h1[t-1]) 
-  l$h$h2[t] = ifelse(t==1,x$a2,l$h$h2[t-1]) 
-  l$shape[t] = ifelse(t==1,1,l$shape[t-1])  
-  l$rate[t] = ifelse(t==1,1,l$rate[t-1])  
+  ## Learn customer type by demand groups
+  cl <- getDemandClusters(l, t, k='auto', maxcl = 2, all = FALSE)
+  l$bss[t] <- getBetweenSS(cl)
+  if ( (l$sig$sig1[t] != l$sig$sig2[t]) & (l$bss[t] > x$cl.cutoff) ) {
+    plotDemandGroups(l$G$G1[[t]],cl)
+    Z <- getZ(x,cl,t)
+    h1 <- sum(Z)
+    h2 <- length(Z) - h1
+    l$q.hat[t] <- h1 / length(Z)
+    ## LEARNING params HERE ...
+    l$h$h1[t] = ifelse(t==1, x$a1, l$h$h1[t-1]) + h1 * x$ep #downweight
+    l$h$h2[t] = ifelse(t==1, x$a2, l$h$h2[t-1]) + h2 * x$ep #downweight
+    l$shape[t] = ifelse(t==1,1,l$shape[t-1])  #+ 1-s.cumu
+    l$rate[t] = ifelse(t==1,1,l$rate[t-1])    #+ s.cumu
+  } else {
+    ## NOT LEARNING HERE ...
+    l$h$h1[t] = ifelse(t==1,x$a1,l$h$h1[t-1])
+    l$h$h2[t] = ifelse(t==1,x$a2,l$h$h2[t-1])
+    l$shape[t] = ifelse(t==1,1,l$shape[t-1])
+    l$rate[t] = ifelse(t==1,1,l$rate[t-1])
+  }
   ## -----------------
   data <- list(G=l$G$G1[t][[1]],  
                L=l$L$L1[t], 
@@ -165,9 +180,11 @@ learnBayesParams <- function(x,l,t)
                shapet= l$shape[t],
                ratet=l$rate[t] )
   ##
-  l$sim[[t]] <- JAGS$new(getModelStr(), c('q','epsilon'))
+  l$sim[[t]] <- JAGS$new(getModelStr(), x$params, n.iter.update=x$n.iter)
   l$sim[[t]]$run(data, period=t)
-  l$sim[[t]]$bivarPlot('q','epsilon', chain=1)
+  if (length(x$params) > 1) {
+    l$sim[[t]]$bivarPlot(x$params[1], x$params[2], chain=1) 
+  }
   l$est[t, ] <- getQhatEst(l$sim[[t]]$mcmc, probs=x$probs, burninProportion = .2)
   return(l)
 }

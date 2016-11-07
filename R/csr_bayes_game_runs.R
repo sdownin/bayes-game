@@ -4,8 +4,9 @@
 ##
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 source(file.path(getwd(),'R','csr_bayes_game_main.R'))
+library(ggplot2)
 
-
+#--------------------------------------------------------------------------------------
 ##  RUN MAIN GAME SIMULATION
 ##  USING GAME SETUP LIST X
 
@@ -14,9 +15,10 @@ Tau <- 5                       # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
-  , q= .5            # focal parameter
-  , epsilon = 1.2    # focal parameter
-  , J1.0=2, J2.0=20  # secondary focal param
+  , params=c('q')
+  , q= .10            # focal parameter
+  , epsilon = 1.5    # ?focal parameter
+  , J1.0=5, J2.0=10  # secondary focal param
   , p1.0=10, p2.0=10
   , v1= 1, v2=1
   , db1=.5, db2=.5          ## 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
@@ -27,9 +29,9 @@ x <- list(t=1
   , psi1=.02, psi2=.02      ## Platform operator CSR cost   moved --> function of (gamma, B, y, p1)
   , a1=1, a2=1
   , r1=.1, r2=.1
-  , omega=2
+  , omega=1
   , growth=.01
-  , Y=10
+  , Y=1000
   , ep=1e-1
   , Tau=Tau
   , probs=c(.005,.025,.5,.975,.995)
@@ -38,12 +40,77 @@ x <- list(t=1
   , sig1=c(rep(0,t1.change.pd),rep(1,Tau-t1.change.pd))
   , sig2=rep(1,Tau)
   , t1.change=t1.change.pd, t2.change=0
+  , cl.cutoff=0.8   # clustering between SS cutoff for 'learning' q
 )
 
 
-##------------------------- RUN -------------------------------------
 
+## RUN 
 l <- playCsrBayesGame(x, learn=TRUE)
+
+cl <- getDemandClusters(l,1,2)
+
+
+
+##----------- Test cluster identification by q size -------
+qis <- rep(seq(0.01,0.02,.01),each=2)
+qis <- c(.01,.1,.4)
+l.list <- list()
+x$sig1 <- c(0,1)
+x$sig2 <- c(1,1)
+x$Tau <- length(x$sig1)
+x$J1.0 <- 5
+x$J2.0 <- 15
+for (i in 1:length(qis)) {
+  x$q <- qis[i]
+  l.list[[i]] <- playCsrBayesGame(x, learn=T)
+}
+
+q_long <- c()
+bss <- c(sapply(l.list, function(l){
+  sapply(seq_along(l$bss),function(i)l$bss[i])
+}))
+diffs <- c(sapply(l.list, function(l){
+  sapply(seq_along(l$sig$sig1), function(i){
+    q_long <<- c(q_long, l$q.true)
+    return( ifelse(l$sig$sig1[i]==l$sig$sig2[i],0,1) )
+  })
+}))
+
+df <- data.frame(q=q_long,bss=bss)
+df$diffs <- factor(diffs)
+#
+pl1 <- ggplot(aes(x=q, y=bss), data=df) + geom_hline(yintercept=0.8) + 
+  geom_point(aes(colour=diffs)) +  geom_smooth(aes(colour=diffs)) + 
+  ylim(0,1) + ggtitle('Buyer Type Identification Accuray by Hedonic Proportion') + 
+  ylab('Between Cluster Sum of Squares') + theme_bw()
+pl1
+##---------------------------------------------------------
+
+#------------ identify demand --------------------------
+t <- 1
+
+## assume known 2 cluster (2 states of nature)
+k <- 2
+
+cl <- getDemandClusters(l$G$G1[[t]], k=2)
+plotDemandGroups(l$G$G1[[t]],cl)
+Z <- getZ(x,cl,t)
+h <- sum(Z)
+qhat <- h / length(Z)
+
+
+cl <- getDemandClusters(l, t=1, k='auto', maxcl = 5, all=F)
+meanQtyVec <- cl[[k]]$cluster
+for (i in 1:k)
+  meanQtyVec[which(meanQtyVec==i)] <- cl[[k]]$centers[i]
+plot(sapply(cl, function(x)sum(x$withinss)),type='b')
+
+# demand clusters
+plyr::count(l$s[[t]])
+plyr::count(l$s[[length(l$s)]])
+# hist(c(l$G$G1[[t]],l$G$G2[[t]]), breaks=20)
+hist(l$G$G1[[t]], breaks=10); abline(v=cl[[k]]$centers, add=T, col='red', lwd=2)
 
 ##-------------------------------------------------------------------
 # check Bayesian t-test (?)
@@ -112,3 +179,27 @@ contour(q,epsilon,s , drawlabels=T, nlevels=k, col=my.cols, add=T, lwd=2)
 #   ylab('q') + ylim(0,1) +
 #   theme_bw()
 # g
+
+s <- 0.0054
+ep <- seq(0,2,.01)
+q <- getQfromEpsilonS(ep,s,sig1=0,sig2=1,J1=5,J2=100, omega=10)
+plot(q, ep, xlim=c(-.01,1.01), type='l',col='red');abline(v=c(0,1))
+
+plot(q ~ ep, ylim=c(-.01,2),type='l',col='red');abline(h=c(0,1))
+
+#------------
+N <- sum(c(2,20)*4)
+h <- getQfromEpsilonS(1.5,.6,sig1=0,sig2=1,J1=2,J2=20, omega=10) * N
+N - abs(h)
+
+s.z0 <- share(p1=10,p2=10,v1=1,v2=1,sig1=0,sig2=1,J1=2,J2=20,omega=10,z=0,epsilon=1.5)
+s.z1<- share(p1=10,p2=10,v1=1,v2=1,sig1=0,sig2=1,J1=2,J2=20,omega=10,z=1,epsilon=1.5)
+
+s.delta <- s.z0 - s.z1
+getQfromEpsilonS(1.5,s.delta,sig1=0,sig2=1,J1=2,J2=20, omega=10)
+
+
+s <- seq(0,1,.001)
+q <- getQfromEpsilonS(1.5,s,sig1=0,sig2=1,J1=5,J2=100, omega=10)
+plot(q ~ s, type='l', xlim=c(0,.02)); abline(h=c(0,1));abline(v=0)
+getQfromEpsilonS(1.1,mean(l$s[[1]]),sig1=0,sig2=1,J1=5,J2=100, p1=1.25,p2=1.25, omega=10)

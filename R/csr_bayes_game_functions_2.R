@@ -15,6 +15,89 @@ setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differe
 ##
 #
 ##
+isGoodClustering <- function(cl, cutoff=0.85, verbose=TRUE)
+{
+  betweenSSportion <- cl$betweenss / (sum(cl$withinss) + cl$betweenss)
+  if(verbose)
+    cat(sprintf('\nbetween SumSq portion: %.3f\n', betweenSSportion))
+  return( cutoff < betweenSSportion )
+}
+
+##
+#
+##
+getBetweenSS <- function(cl)
+{
+  return(cl$betweenss / (sum(cl$withinss) + cl$betweenss))
+}
+
+##
+#
+##
+getDemandClusters <- function(l, t, k=2, maxcl=5, force=TRUE, all=FALSE)
+{
+  x <- l$G$G1[[t]]
+  if( !force & l$sig$sig1[t]==l$sig$sig2[t]) {
+    cat('\nSame CSR strategies. returning 1 cluster\n')
+    return( kmeans(x = x, centers = 1)  )
+  }
+  is <- 1:maxcl
+  cl <- list()
+  if (typeof(k)=='character' | is.na(k)) {
+    for (i in is) {
+      cl[[i]] <- kmeans(x = x, centers = i)     
+    }
+    wss <- sapply(cl,function(x)sum(x$withinss))
+    k <- which.min(diff(wss)) + 1
+    if (all)
+      return(cl)
+    else
+      return(cl[[k]])
+  }
+  return(kmeans(x = x, centers = k))
+}
+
+##
+#
+##
+## see demand groups
+plotDemandGroups <- function(x,cl) {
+  hist(x, col='lightgray', breaks=10,main='Demand Groups'); abline(v=cl$centers, col='red', lwd=2)
+}
+##
+# Get customer type vector Z = z_i in {0,1}
+# @param vec          x    The observed demand 
+# @param [[kmeans]]   cl   An object of class kmeans, kmeans clustering output
+## 
+getZ <- function(x,cl,t) {
+  if (x$sig1[t] < x$sig2[t]) {
+    z1index <- which.min(cl$centers)  
+    z0index <- which.max(cl$centers)
+  } else if (x$sig1[t] > x$sig2[t])  {
+    z1index <- which.max(cl$centers)  
+    z0index <- which.min(cl$centers)
+  }
+  Z <- sapply(cl$cluster, function(x)ifelse(x==z1index,1,0))  
+}
+
+
+##
+#
+##
+getQfromEpsilonS <- function(epsilon,s,sig1=0,sig2=1,omega=1,J1=2,J2=20,v1=1,v2=1,p1=10,p2=10)
+{
+  s1 <- s
+  s2 <- 1-s
+  x1 <- (v1 * J1^epsilon) * p2 * s2
+  x2 <- (v2 * J2^epsilon) * p1 * s1
+  y1 <- (sig1 * J1^epsilon) * p2 * s2
+  y2 <- (sig2 * J2^epsilon) * p1 * s1
+  z <- (x1 - x2) / (y2 - y1)
+  return((1/omega) * z)
+}
+##
+#
+##
 persp.withcol <- function(x,y,z,pal,nb.col,...,xlg=TRUE,ylg=TRUE)
 {
   colnames(z) <- y
