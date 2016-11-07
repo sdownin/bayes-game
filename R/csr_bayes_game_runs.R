@@ -10,16 +10,16 @@ library(ggplot2)
 ##  RUN MAIN GAME SIMULATION
 ##  USING GAME SETUP LIST X
 
-t1.change.pd <- 3              # platform 1 adds CSR policy at period
-Tau <- 5                       # number of periods
+t1.change.pd <- 8              # platform 1 adds CSR policy at period
+Tau <- 10                       # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
+  , q= .27           # focal parameter
+  , epsilon = 1.5    # focal parameter
   , params=c('q')
-  , q= .10            # focal parameter
-  , epsilon = 1.5    # ?focal parameter
-  , J1.0=5, J2.0=10  # secondary focal param
-  , p1.0=10, p2.0=10
+  , J1.0=8, J2.0=24  # secondary focal param
+  , p1.0=1, p2.0=1
   , v1= 1, v2=1
   , db1=.5, db2=.5          ## 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
   , dj1=.1, dj2=.1
@@ -36,33 +36,35 @@ x <- list(t=1
   , Tau=Tau
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
-  , n.iter=1000
+  , n.iter=4000
   , sig1=c(rep(0,t1.change.pd),rep(1,Tau-t1.change.pd))
   , sig2=rep(1,Tau)
   , t1.change=t1.change.pd, t2.change=0
-  , cl.cutoff=0.8   # clustering between SS cutoff for 'learning' q
+  , cl.cutoff=0.7   # clustering between SS cutoff for 'learning' q
+  , parallel = FALSE  # problems with jags.parallel inits
+  , n.cores = 4
 )
-
 
 
 ## RUN 
 l <- playCsrBayesGame(x, learn=TRUE)
 
-cl <- getDemandClusters(l,1,2)
+par(mfrow=c(3,3)); for (i in 1:length(l$G$G1))hist(l$G$G1[[i]], col='lightgray')
 
 
 
 ##----------- Test cluster identification by q size -------
-qis <- rep(seq(0.01,0.02,.01),each=2)
-qis <- c(.01,.1,.4)
-l.list <- list()
+# qis <- rep(seq(0.005,0.4,.01),each=2)
+# l.list <- list()
+qis <- rep(seq(0.4,0.5,.01),each=2)
 x$sig1 <- c(0,1)
 x$sig2 <- c(1,1)
 x$Tau <- length(x$sig1)
 x$J1.0 <- 5
 x$J2.0 <- 15
-for (i in 1:length(qis)) {
-  x$q <- qis[i]
+for (j in seq_along(qis) ) {
+  i <- length(l.list) + 1
+  x$q <- qis[j]
   l.list[[i]] <- playCsrBayesGame(x, learn=T)
 }
 
@@ -79,12 +81,13 @@ diffs <- c(sapply(l.list, function(l){
 
 df <- data.frame(q=q_long,bss=bss)
 df$diffs <- factor(diffs)
-#
+#  Plot clustering accuracy
 pl1 <- ggplot(aes(x=q, y=bss), data=df) + geom_hline(yintercept=0.8) + 
   geom_point(aes(colour=diffs)) +  geom_smooth(aes(colour=diffs)) + 
   ylim(0,1) + ggtitle('Buyer Type Identification Accuray by Hedonic Proportion') + 
   ylab('Between Cluster Sum of Squares') + theme_bw()
 pl1
+ggsave('buyer_type_id_accuracy_2.png', plot=pl1, width=6, height=5, units='in')
 ##---------------------------------------------------------
 
 #------------ identify demand --------------------------

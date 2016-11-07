@@ -7,11 +7,22 @@ library(latticeExtra)
 library(plyr)
 library(parallel)
 library(fields)
+library(random)
+library(foreach)
+library(snow)
 
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 
 
 #--------------------------- FUNCTIONS -----------------------------------------
+##
+#
+##
+ciPlot <- function(x, ...) {
+  len <- ncol(x)
+  matplot(x, type='l', col=c(1,1,2,1,1), lty=c(3,3,1,3,3), ...)
+}
+
 ##
 #
 ##
@@ -462,17 +473,45 @@ getQhatMcmc <- function(data, modelstring, variables=c('q'), n.chains=2, n.adapt
   output <- coda.samples(model=model, variable.names=variables,n.iter=n.iter.samples, thin=thin)
   return(output)
 }
+# 
+# n.iter <- 10000
+# model.file <- "csr_bayes_game.bug"
+# capture.output(cat(stringr::str_replace_all(getModelStr(),"\n","")), file=model.file)
+# jags.inits <- function() {
+#   return(list("q"=runif(1)))
+# }
+# output.mcmc <- as.mcmc(do.call(jags.parallel,
+#                list(data = data,  parameters.to.save = c('q'),
+#                     n.chains=4, n.iter=n.iter, n.burnin=ceiling(n.iter * .4),
+#                     model.file=model.file)))
+# out.mcmc <- as.mcmc(out)
+# densplot(out.mcmc)
+# 
+# 
+# # runJags <- function(data, modelstring, variables=c('q'), n.chains=2, n.adapt=3000,n.iter.update=3000, n.iter.samples=3000, thin=3, seed=1111)
+# # {
+#   cat('Starting MCMC . . . \n')
+#   set.seed(1111)
+#   clust <- makeCluster(4, type = "SOCK")
+#   model <- jags.model(textConnection(getModelStr()),
+#                       data=data,n.chains=4 )
+#   ## BURN IN ITERATIONS TO APPROACH STATIONARY DISTRIBUTION
+#   update(model, n.iter=1000)
+#   ## ADAPTIVE SAMPLES FROM STATIONARY DISTRIBUTION TO SIMULATE POSTERIOR 
+#   output <- coda.samples(model=model, variable.names='q',n.iter=1000, thin=2)
+# #   return(output)
+# # }
 
 ##
 #
 #
 ##
-getQhatEst <- function(mcmc.output, probs, burninProportion=.2)
+getParamEst <- function(mcmc.output, param, probs, burninProportion=.2)
 {
   samps <- unlist(sapply(mcmc.output,function(x){
-    len <- length(x)
+    len <- nrow(x)
     burn <- ceiling(burninProportion*len)
-    x[burn:len]
+    x[burn:len, param]
   }))
   return(quantile(samps, probs))
 }
@@ -485,10 +524,10 @@ plotMCMCdiagnostics <- function(output,t,param='q')
 {
   n.chains <- length(output)
   par(mfrow=c(2,2),mar=c(4,3,2,2))
-  mcmcplots::denplot(output,style = 'plain',auto.layout = F,main=sprintf("Density of %s (t=%s)",param,t))
-  mcmcplots::traplot(output,style = 'plain',auto.layout = F,main=sprintf("Trace of %s (t=%s)",param,t))
-  mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main=sprintf("Thinned Running Mean of %s (t=%s)",param,t))
-  mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main=sprintf("Autocorrelation of %s (t=%s)",param,t))
+  try(mcmcplots::denplot(output,style = 'plain',auto.layout = F,main=sprintf("Density of %s (t=%s)",param,t)))
+  try(mcmcplots::traplot(output,style = 'plain',auto.layout = F,main=sprintf("Trace of %s (t=%s)",param,t)))
+  try(mcmcplots::rmeanplot(output,style = 'plain',auto.layout = F,main=sprintf("Thinned Running Mean of %s (t=%s)",param,t)))
+  try(mcmcplots::autplot1(output, chain=n.chains,style = 'plain', main=sprintf("Autocorrelation of %s (t=%s)",param,t)))
 }
 
 ##

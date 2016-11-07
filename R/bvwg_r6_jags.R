@@ -3,6 +3,7 @@ library(mcmcplots)
 library(RColorBrewer)
 library(MASS)
 library(rjags)
+library(R2jags)
 library(R6)
 library(psych)
 
@@ -32,14 +33,14 @@ JAGS <- R6Class(
   "JAGS",
   public = list(
     probs = c(.005,.025,.5,.975,.995),
-    modelString = NA,
+    modelstring = NA,
     params = NA,
     config = list(n.chains=3,n.adapt=2400,n.iter.update=2400,n.iter.samples=2400, thin=3,seed=1111),
     mcmc = list(),
     est = list(),
     
-    initialize = function(modelString=NA,params=NA,n.chains=3,...) {
-      self$modelString <- modelString
+    initialize = function(modelstring=NA,params=NA,n.chains=3,...) {
+      self$modelstring <- modelstring
       self$params <- params
       self$config$n.chains <- n.chains
       items <- list(...)
@@ -55,8 +56,8 @@ JAGS <- R6Class(
       self$config <- c(self$config, l)
     },
     
-    run = function(data, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
-      model <- jags.model(textConnection(self$modelString), data=data, n.adapt=self$config$n.adapt, n.chains=self$config$n.chains )
+    run.old = function(data, parallel=T, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
+      model <- jags.model(textConnection(self$modelstring), data=data, n.adapt=self$config$n.adapt, n.chains=self$config$n.chains )
       set.seed(self$seed)
       update(model, n.iter=self$config$n.iter.update)
       self$mcmc <- coda.samples(model=model, variable.names=self$params, n.iter=self$config$n.iter.samples, thin=self$config$thin)
@@ -78,6 +79,52 @@ JAGS <- R6Class(
       if (returnOutput)
         return(self$mcmc)
     },
+    
+    ##------------
+    run =  function(data, parallel=T, envir=NA, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
+      if (parallel)
+        self$mcmc <- self$.runMcmcParallel(data, envir)
+      else
+        self$mcmc <- self$.runMcmc(data)
+      print(summary(self$mcmc))
+      self$setEst()
+      if (getNIter)
+        self$config$n.iter <- self$getNIterRafDiag(self$mcmc) 
+      if (runDiag) 
+        self$getHeidConvDiag(self$mcmc)
+      if (showMcmcPlot) {
+        for (param in self$params)  {
+          cat(sprintf('plotting param %s at period %s ',param, period))
+          self$mcmcPlot(self$mcmc, param, period)
+        }
+      }
+      if (showGelmanPlot)
+        gelman.plot(self$mcmc)
+      if (returnOutput)
+        return(self$mcmc)
+    }, 
+    
+    .runMcmc = function(data)  {
+      model <- jags.model(textConnection(self$modelstring), data=data, n.adapt=self$config$n.adapt, n.chains=self$config$n.chains )
+      set.seed(self$seed)
+      update(model, n.iter=self$config$n.iter.update)
+      mcmc.output <- coda.samples(model=model, variable.names=self$params, n.iter=self$config$n.iter.samples, thin=self$config$thin)
+      return(mcmc.output)
+    }, 
+    
+    .runMcmcParallel = function(data, envir)   {
+      model.file <- "bvwg_r6_jags.bug"
+      capture.output(cat(stringr::str_replace_all(self$modelString,"\n","")), file=model.file)
+      mcmc.output <- as.mcmc(do.call(jags.parallel,
+                                     list(data = data,  parameters.to.save = self$params,
+                                          n.chains=4, n.iter=self$config$n.iter.samples, 
+                                          n.burnin=ceiling(self$config$n.iter.samples*.3),
+                                          model.file=model.file, envir=envir
+                                     ), envir = envir
+      ))
+      return(mcmc.output)
+    },
+    ##-------------
     
     getNIterRafDiag = function(mcmc.output, q=0.025, r=0.005, s=0.95) {
       raf.test <- try(raftery.diag(c(mcmc.output), q=q, r=r, s=s), silent=T)
