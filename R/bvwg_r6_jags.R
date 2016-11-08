@@ -83,7 +83,7 @@ JAGS <- R6Class(
     ##------------
     run =  function(data, inits=NA, parallel=T, envir=NA, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
       if (parallel)
-        self$mcmc <- self$.runMcmcParallel(data, envir)
+        self$mcmc <- self$.runMcmcParallel(data, inits, envir)
       else
         self$mcmc <- self$.runMcmc(data, inits)
       print(summary(self$mcmc))
@@ -112,11 +112,12 @@ JAGS <- R6Class(
       return(mcmc.output)
     }, 
     
-    .runMcmcParallel = function(data, envir)   {
+    .runMcmcParallel = function(data, inits, envir)   {
       model.file <- "bvwg_r6_jags.bug"
       capture.output(cat(stringr::str_replace_all(self$modelString,"\n","")), file=model.file)
       mcmc.output <- as.mcmc(do.call(jags.parallel,
-                                     list(data = data,  parameters.to.save = self$params,
+                                     list(data = data,  inits=inits, 
+                                          parameters.to.save = self$params,
                                           n.chains=4, n.iter=self$config$n.iter.samples, 
                                           n.burnin=ceiling(self$config$n.iter.samples*.3),
                                           model.file=model.file, envir=envir

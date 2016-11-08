@@ -41,13 +41,14 @@ x <- list(t=1
   , sig2=rep(1,Tau)
   , t1.change=t1.change.pd, t2.change=0
   , cl.cutoff=0.7   # clustering between SS cutoff for 'learning' q
-  , parallel = FALSE  # problems with jags.parallel inits
+  , parallel = TRUE  # problems with jags.parallel inits
   , n.cores = 4
+  , learn = TRUE
 )
 
 
 ## RUN 
-l <- playCsrBayesGame(x, learn=TRUE)
+l <- playCsrBayesGame(x)
 
 par(mfrow=c(3,3)); for (i in 1:length(l$G$G1))hist(l$G$G1[[i]], col='lightgray')
 

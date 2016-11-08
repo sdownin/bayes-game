@@ -44,26 +44,27 @@ getModelStr.qepsilon <- function() {
 ##
 .sampleMcmcPar <- function(l,x,t, params, n.iter, burninProportion = 0.4)
 { #n.cores = n.chains
-  model.file <- "bvwg_r6_jags.bug"
+  model.file <- "model.bug"
   #jags.inits <- function() {li <- list(); for(i in seq_len(x$n.cores)) li[[i]] <- l$param.inits;  return(li)}
   capture.output(cat(stringr::str_replace_all(l$modelstring,"\n","")), file=model.file)
   samples <- as.mcmc(do.call(jags.parallel,
-                             list(data = data, #inits=jags.inits(),  
-                                  parameters.to.save = x$params,
-                                  n.chains=x$n.cores, n.iter=x$n.iter, 
-                                  n.burnin=ceiling(x$n.iter*burninProportion),
-                                  model.file=model.file)
-  )
+       list(data = data, inits=l$param.inits,  
+            parameters.to.save = x$params,  model.file=model.file,
+            n.chains=x$n.cores, n.iter=x$n.iter, 
+            n.burnin=ceiling(x$n.iter*burninProportion))
+      )
   )
   return(samples)
 }
+
+
 ##
 #
 ##
 runMcmcPar <- function(l,x,t, gelmanPlot=F) 
 {
   mcmc.output <- .sampleMcmcPar(l, x, t)
-  self$getHeidConvDiag(mcmc.output)
+  getHeidConvDiag(mcmc.output)
   for (param in x$params) 
     plotMCMCdiagnostics(mcmc.output,t,param)
   if(gelmanPlot)
@@ -135,6 +136,7 @@ initCsrBayesGameConfig <- function(x)
         , G=list(G1=list(),G2=list())
         , modelstring=ifelse('epsilon'%in%x$params,getModelStr.qepsilon(), getModelStr())
         , t=x$t
+        # , param.inits=x$param.inits
   )
   
   t <- l$t
@@ -184,13 +186,13 @@ initCsrBayesGameConfig <- function(x)
 # @param x [list] all game parameters
 # @returns [list] game outcomes per variable and MCMC samples
 ##
-playCsrBayesGame <- function(x, learn=TRUE, verbose=TRUE)
+playCsrBayesGame <- function(x, ..., verbose=TRUE)
 {
   l <- initCsrBayesGameConfig(x)
   t <- l$t
   #--------------------------------- INITIAL PERIOD ------------------------------------------
   ## LEARN Qhat
-  if(learn) {
+  if(x$learn) {
     l <- learnBayesParams(x,l,t)
     ## CHECK N_MIN  ITERATIONS WITH RAFTERY & LEWIS DIAGNOSTIC 
     ## ERROR:  +/- 1%
@@ -280,18 +282,25 @@ learnBayesParams <- function(x,l,t)
                ratet=l$rate[t] )
   if ( !('epsilon' %in% x$params) ) data$epsilon <- l$epsilon.true
   if ( !('q' %in% x$params)       ) data$q <- l$q.true
+  
   ##
-  l$param.inits <- list()
-  for (param in x$params) {
-    l$param.inits[[param]] <- ifelse(param=='q',rbeta(1,l$h$h1[t],l$h$h2[t]),ifelse(param=='epsilon',rgamma(1,1,1),rnorm(1)))
-  }
+  # l$param.inits <- list()
+  # for (param in x$params) {
+  #   l$param.inits[[param]] <- ifelse(param=='q',rbeta(1,l$h$h1[t],l$h$h2[t]),ifelse(param=='epsilon',rgamma(1,1,1),rnorm(1)))
+  # }
+  l$param.inits=function(){list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]),"epsilon"=rgamma(1,1,1))}
+  
   ## JAGS object if not parallel or MCMC object if parallel
   if(x$parallel) {
     l$sim[[t]] <- runMcmcPar(l,x,t)
   } else {
     l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter.update=x$n.iter)
-    l$sim[[t]]$run(data, l$param.inits, parallel = F, envir=environment(), period=t)       
+    l$sim[[t]]$run(data, l$param.inits, parallel = x$parallel, period=t) #envir=environment(),
   }
+  
+  # l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter.update=x$n.iter)
+  # l$sim[[t]]$run(data, l$param.inits, parallel = x$parallel,envir = environment(), period=t) #envir=environment(),       
+  
 
   # if ( !x$parallel & length(x$params) > 1) {
   #   l$sim[[t]]$bivarPlot(x$params[1], x$params[2], chain=1) 
@@ -358,7 +367,7 @@ updateGame <- function(l, t)
   l$G$G2[[t]] <- getG(1-l$s[[t]], l$L$L2[t], l$M[t])
   
   ## LEARN Qhat
-  if(learn) {
+  if(x$learn) {
     l <- learnBayesParams(x,l,t)
   }
   
