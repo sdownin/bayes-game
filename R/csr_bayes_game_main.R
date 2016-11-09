@@ -7,24 +7,47 @@ setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differe
 source(file.path(getwd(),'R','csr_bayes_game_functions_2.R'))
 source(file.path(getwd(),'R','bvwg_r6_jags.R'))      # {.GLOBAL} JAGS
 
+library(runjags)
+library(random)
+load.runjagsmodule()
 
+# ##
+# #
+# ##
+# getModelStr <- function() {
+#   "model{
+#   for (i in 1:n) {
+#   z[i] ~ dbern(q)
+#   th1[i] <- p2*(v1 + omega*sig1*z[i])
+#   th2[i] <- p1*(v2 + omega*sig2*z[i])
+#   s[i] <- ((th1[i]/th2[i])*pow(J1, epsilon)) / ( (th1[i]/th2[i])*pow(J1, epsilon) + pow(J2, epsilon) )
+#   G[i] ~ dbinom( s[i], L )
+#   }
+#   q ~ dbeta(h1t,h2t)
+# }"
+# }
 
-##
-#
-##
-getModelStr <- function() {
-  "model{
-  for (i in 1:n) {
-  z[i] ~ dbern(q)
-  th1[i] <- p2*(v1 + omega*sig1*z[i])
-  th2[i] <- p1*(v2 + omega*sig2*z[i])
-  s[i] <- ((th1[i]/th2[i])*pow(J1, epsilon)) / ( (th1[i]/th2[i])*pow(J1, epsilon) + pow(J2, epsilon) )
-  G[i] ~ dbinom( s[i], L )
+getModelStr <- function(params, vars=c()) {
+  for (param in params) {
+    vars <- c(vars, switch(param
+      , 'q'='q ~ dbeta(h1t,h2t)'
+      , 'epsilon'='epsilon ~ dgamma(shapet,ratet)')
+    )
   }
-  q ~ dbeta(h1t,h2t)
-}"
+  str <- 
+  "model{
+    for (i in 1:n) {
+    z[i] ~ dbern(q)
+    th1[i] <- p2*(v1 + omega*sig1*z[i])
+    th2[i] <- p1*(v2 + omega*sig2*z[i])
+    s[i] <- ((th1[i]/th2[i])*pow(J1, epsilon)) / ( (th1[i]/th2[i])*pow(J1, epsilon) + pow(J2, epsilon) )
+    G[i] ~ dbinom( s[i], L )
+    }
+    %s
+  }"
+  return( sprintf(str, paste(vars, collapse="\n")) )
 }
-
+  
 getModelStr.qepsilon <- function() {
   "model{
   for (i in 1:n) {
@@ -38,6 +61,24 @@ getModelStr.qepsilon <- function() {
   q ~ dbeta(h1t,h2t)
 }"
 }
+
+##
+#
+#  'rjags', 'simple', 'interruptible', 'parallel', 'rjparallel', 
+#  'background', 'bgparallel' or 'snow'
+###
+# x$n.iter = 15000
+# 
+# system.time(
+# rjout <- runjags::run.jags(getModelStr(x$params), monitor=x$params, data=data, 
+#                   n.chains=x$n.cores, inits=l$param.inits, 
+#                   method="rjparallel",
+#                   adapt=ceiling(x$n.iter*(1/15)),
+#                   burnin=ceiling(x$n.iter*(4/15)),
+#                   sample=ceiling(x$n.iter*(10/15)))
+# )
+# 
+# mcmc <- coda::as.mcmc(mcmc.out)
 
 ##
 #
@@ -134,8 +175,10 @@ initCsrBayesGameConfig <- function(x)
         , z=list()  
         , s=list() 
         , G=list(G1=list(),G2=list())
-        , modelstring=ifelse('epsilon'%in%x$params,getModelStr.qepsilon(), getModelStr())
+        , modelstring=getModelStr(params = x$params)
         , t=x$t
+        , n.iter = x$n.iter
+        , probs = x$probs
         # , param.inits=x$param.inits
   )
   
@@ -196,14 +239,18 @@ playCsrBayesGame <- function(x, ..., verbose=TRUE)
     l <- learnBayesParams(x,l,t)
     ## CHECK N_MIN  ITERATIONS WITH RAFTERY & LEWIS DIAGNOSTIC 
     ## ERROR:  +/- 1%
-    r <- 0.01; counter <- 1
-    x$n.iter <- try(getNIterRafDiag(l$sim[[t]]$mcmc, q = .025, r=r, s=0.95), silent = T)
-    while ("try-error" %in% class(x$n.iter) & counter < 4) {
+    r <- 0.005; counter <- 1
+    l$n.iter <- try(getNIterRafDiag(l$sim[[t]]$mcmc, q = .025, r=r, s=0.95), silent = T)
+    while ("try-error" %in% class(l$n.iter) & counter < 7) {
       cat(sprintf('Raftery & Lewis Diag redo: r = %.3f\n', r))
-      r <- r*.8
-      x$n.iter <- try(getNIterRafDiag(l$sim[[t]]$mcmc, q = .025, r=r, s=0.95), silent = T)
+      r <- r*.5
+      l$n.iter <- try(getNIterRafDiag(l$sim[[t]]$mcmc, q = .025, r=r, s=0.95), silent = T)
       counter <- counter + 1
     }
+    l$n.iter <- ifelse("try-error" %in% class(x$n.iter), x$n.iter, l$n.iter)
+    cat(sprintf('\nRaftery & Lewis Diag: %s\n', l$n.iter))
+    ## RERUN with min samples 
+    l <- learnBayesParams(x,l,t)
   }
   #### OUTCOME2
   ## Quantity
@@ -222,14 +269,14 @@ playCsrBayesGame <- function(x, ..., verbose=TRUE)
     }    
   }
   #--------------------------------- END MAIN GAME LOOP ---------------------------
-  par(mfrow=c(2,2))
+  ## PLOTS
   for (param in x$params) {
-    ciPlot(l$est[[param]], main=param)
+    true <- switch(param, 'q'=l$q.true, 'epsilon'=l$epsilon.true)
+    ciPlot(l$est[[param]], main=sprintf('MCMC Estimate for %s',param)); abline(v=x$t1.change);abline(h=true,col='gray')
   }
   cumuplot(na.omit(l$q.hat), main="q_hat Estimated from Inferred Z vector")
-  par(mfrow=c(1,1))
-  hsummary <- sapply(1:nrow(l$h), function(i)quantile(rbeta(1000,l$h[i,1],l$h[i,2]),probs =x$probs))
-  ciPlot(t(hsummary), main="q_hat Est. from inferred Z with parameter learning",xlab="period")
+  hsummary <- sapply(1:nrow(l$h), function(i)quantile(rbeta(1000,l$h[i,1],l$h[i,2]),probs =l$probs))
+  ciPlot(t(hsummary), main="q Beta Posterior from Inferred Buyer Types (Z)",xlab="period"); abline(v=x$t1.change);abline(h=l$q.true,col='gray')
   return(l)
 }
 
@@ -239,7 +286,7 @@ playCsrBayesGame <- function(x, ..., verbose=TRUE)
 ##
 learnBayesParams <- function(x,l,t)
 { 
-  cat(sprintf('Starting MCMC%s %s iterations\n', ifelse(x$parallel, paste0(' in parallel on ',x$n.cores,' cores'),''),x$n.iter))
+  cat(sprintf('Starting MCMC%s %s iterations\n', ifelse(x$parallel, paste0(' in parallel on ',x$n.cores,' cores'),''),l$n.iter))
   l$s.diff[t] <- mean(l$s[[t]]) - mean(l$s.base)
   s.cumu <- sum(unlist(l$G$G1)) / sum(unlist(c(l$G$G1,l$G$G2)))
   ## Learn customer type by demand groups
@@ -288,19 +335,37 @@ learnBayesParams <- function(x,l,t)
   # for (param in x$params) {
   #   l$param.inits[[param]] <- ifelse(param=='q',rbeta(1,l$h$h1[t],l$h$h2[t]),ifelse(param=='epsilon',rgamma(1,1,1),rnorm(1)))
   # }
-  l$param.inits=function(){list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]),"epsilon"=rgamma(1,1,1))}
   
-  ## JAGS object if not parallel or MCMC object if parallel
-  if(x$parallel) {
-    l$sim[[t]] <- runMcmcPar(l,x,t)
-  } else {
-    l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter.update=x$n.iter)
-    l$sim[[t]]$run(data, l$param.inits, parallel = x$parallel, period=t) #envir=environment(),
+  rngs <- c("base::Super-Duper", "base::Mersenne-Twister",
+            "base::Wichmann-Hill", "base::Marsaglia-Multicarry")
+  l$param.inits <- list()
+  for (i in 1:x$n.cores) {
+    l$param.inits[[paste0("inits",i)]] <- list()
+    if ('q' %in% x$params) l$param.inits[[paste0("inits",i)]]$q <- rbeta(1,l$h$h1[t],l$h$h2[t])
+    if ('epsilon' %in% x$params) l$param.inits[[paste0("inits",i)]]$epsilon <- rgamma(1,1,1)
+    l$param.inits[[paste0("inits",i)]]$.RNG.name <- rngs[i]
+    l$param.inits[[paste0("inits",i)]]$.RNG.seed <- 12340+i
   }
   
-  # l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter.update=x$n.iter)
-  # l$sim[[t]]$run(data, l$param.inits, parallel = x$parallel,envir = environment(), period=t) #envir=environment(),       
+  # inits1 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[1], ".RNG.seed"=12341)
+  # inits2 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[2], ".RNG.seed"=12342)
+  # inits3 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[3], ".RNG.seed"=12343)
+  # inits4 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[4], ".RNG.seed"=12344)
+  # l$param.inits <- function(){
+  #   list(inits1=inits1,inits2=inits2,inits3=inits3,inits4=inits4)
+  # }
   
+  ### JAGS object if not parallel or MCMC object if parallel
+  # if(x$parallel) {
+  #   l$sim[[t]] <- runMcmcPar(l,x,t)
+  # } else {
+  #   l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter.update=x$n.iter)
+  #   l$sim[[t]]$run(data, l$param.inits, parallel = x$parallel, period=t) #envir=environment(),
+  # }
+  #
+  l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter=l$n.iter, method=x$method)
+  l$sim[[t]]$run(data = data, inits = l$param.inits, parallel = x$parallel,envir = environment(), period=t) #envir=environment(),
+
 
   # if ( !x$parallel & length(x$params) > 1) {
   #   l$sim[[t]]$bivarPlot(x$params[1], x$params[2], chain=1) 

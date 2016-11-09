@@ -3,7 +3,8 @@ library(mcmcplots)
 library(RColorBrewer)
 library(MASS)
 library(rjags)
-library(R2jags)
+library(runjags); load.runjagsmodule();
+library(random)
 library(R6)
 library(psych)
 
@@ -35,14 +36,13 @@ JAGS <- R6Class(
     probs = c(.005,.025,.5,.975,.995),
     modelstring = NA,
     params = NA,
-    config = list(n.chains=3,n.adapt=2400,n.iter.update=2400,n.iter.samples=2400, thin=3,seed=1111),
+    config = list(n.chains=4,n.iter=15000, thin=2,seed=1111),
     mcmc = list(),
     est = list(),
     
-    initialize = function(modelstring=NA,params=NA,n.chains=3,...) {
+    initialize = function(modelstring=NA,params=NA,...) {
       self$modelstring <- modelstring
       self$params <- params
-      self$config$n.chains <- n.chains
       items <- list(...)
       for (item in names(items)){
         if (item %in% names(self$config)) 
@@ -56,16 +56,16 @@ JAGS <- R6Class(
       self$config <- c(self$config, l)
     },
     
-    run.old = function(data, parallel=T, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
+    run.old = function(data, parallel=T, period=NA, returnOutput=F, getNIter=F, runDiag=T, showMcmcPlot=T, showGelmanPlot=F, ...) {
       model <- jags.model(textConnection(self$modelstring), data=data, n.adapt=self$config$n.adapt, n.chains=self$config$n.chains )
       set.seed(self$seed)
       update(model, n.iter=self$config$n.iter.update)
       self$mcmc <- coda.samples(model=model, variable.names=self$params, n.iter=self$config$n.iter.samples, thin=self$config$thin)
       print(summary(self$mcmc))
       self$setEst()
-      
+      #
       if (getNIter)
-        self$config$n.iter <- self$getNIterRafDiag(self$mcmc) 
+        self$config$n.iter <- self$getNIterRafDiag(self$mcmc, ...) 
       if (runDiag) 
         self$getHeidConvDiag(self$mcmc)
       if (showMcmcPlot) {
@@ -81,7 +81,7 @@ JAGS <- R6Class(
     },
     
     ##------------
-    run =  function(data, inits=NA, parallel=T, envir=NA, period=NA, returnOutput=F, getNIter=T, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
+    run =  function(data, inits=NA, parallel=T, envir=NA, period=NA, returnOutput=F, getNIter=F, runDiag=T, showMcmcPlot=T, showGelmanPlot=F) {
       if (parallel)
         self$mcmc <- self$.runMcmcParallel(data, inits, envir)
       else
@@ -113,16 +113,23 @@ JAGS <- R6Class(
     }, 
     
     .runMcmcParallel = function(data, inits, envir)   {
-      model.file <- "bvwg_r6_jags.bug"
-      capture.output(cat(stringr::str_replace_all(self$modelString,"\n","")), file=model.file)
-      mcmc.output <- as.mcmc(do.call(jags.parallel,
-                                     list(data = data,  inits=inits, 
-                                          parameters.to.save = self$params,
-                                          n.chains=4, n.iter=self$config$n.iter.samples, 
-                                          n.burnin=ceiling(self$config$n.iter.samples*.3),
-                                          model.file=model.file, envir=envir
-                                     ), envir = envir
-      ))
+        rjout <- runjags::run.jags(self$modelstring, monitor=self$params, data=data, 
+                                   n.chains=self$config$n.chains, inits=inits, 
+                                   method=self$config$method,
+                                   adapt=ceiling(self$config$n.iter*.1),
+                                   burnin=ceiling(self$config$n.iter*.4),
+                                   sample=ceiling(self$config$n.iter))
+        mcmc.output <- coda::as.mcmc.list(rjout)
+      # model.file <- "bvwg_r6_jags.bug"
+      # capture.output(cat(stringr::str_replace_all(self$modelString,"\n","")), file=model.file)
+      # mcmc.output <- as.mcmc(do.call(jags.parallel,
+      #                                list(data = data,  inits=inits, 
+      #                                     parameters.to.save = self$params,
+      #                                     n.chains=4, n.iter=self$config$n.iter.samples, 
+      #                                     n.burnin=ceiling(self$config$n.iter.samples*.3),
+      #                                     model.file=model.file, envir=envir
+      #                                ), envir = envir
+      # ))
       return(mcmc.output)
     },
     ##-------------

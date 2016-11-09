@@ -20,7 +20,7 @@ setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differe
 ##
 ciPlot <- function(x, ...) {
   len <- ncol(x)
-  matplot(x, type='l', col=c(1,1,2,1,1), lty=c(3,3,1,3,3), ...)
+  matplot(x, type='o', pch=c(NA,NA,16,NA,NA), col=c(1,1,2,1,1), lty=c(3,2,1,2,3), lwd=c(1,1,2,1,1), ...)
 }
 
 ##
@@ -73,7 +73,7 @@ getDemandClusters <- function(l, t, k=2, maxcl=5, force=TRUE, all=FALSE)
 ##
 ## see demand groups
 plotDemandGroups <- function(x,cl) {
-  hist(x, col='lightgray', breaks=10,main='Demand Groups'); abline(v=cl$centers, col='red', lwd=2)
+  hist(x, col='lightgray', breaks=15,main='Demand Groups'); abline(v=cl$centers, col='red', lwd=2)
 }
 ##
 # Get customer type vector Z = z_i in {0,1}
@@ -556,7 +556,7 @@ getNIterRafDiag <- function(mcmc.samp.output, q=0.025, r=0.005, s=0.95)
   if (inherits(raf.test, 'try-error'))
     stop(sprintf('the error level r=%s is too high. Try again with smaller r.',r))
   nmin <- as.numeric(raf.test$resmatrix[2])
-  cat(sprintf('Raftery & Lewis N_min interations = %s',nmin))
+  cat(sprintf('Raftery & Lewis N_min interations = %s\n',nmin))
   return(nmin)
 }
 

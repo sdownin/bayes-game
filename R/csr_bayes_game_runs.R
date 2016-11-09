@@ -11,14 +11,14 @@ library(ggplot2)
 ##  USING GAME SETUP LIST X
 
 t1.change.pd <- 8              # platform 1 adds CSR policy at period
-Tau <- 10                       # number of periods
+Tau <- 10                      # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
   , q= .27           # focal parameter
-  , epsilon = 1.5    # focal parameter
-  , params=c('q', 'epsilon')
-  , J1.0=8, J2.0=24  # secondary focal param
+  , epsilon = 1    # focal parameter
+  , params=c('q')
+  , J1.0=50, J2.0=200  # secondary focal param
   , p1.0=1, p2.0=1
   , v1= 1, v2=1
   , db1=.5, db2=.5          ## 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
@@ -36,15 +36,18 @@ x <- list(t=1
   , Tau=Tau
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
-  , n.iter=4000
+  , n.iter=1000
   , sig1=c(rep(0,t1.change.pd),rep(1,Tau-t1.change.pd))
   , sig2=rep(1,Tau)
   , t1.change=t1.change.pd, t2.change=0
   , cl.cutoff=0.7   # clustering between SS cutoff for 'learning' q
-  , parallel = TRUE  # problems with jags.parallel inits
+  , parallel = TRUE  
+  , method = 'rjparallel'
   , n.cores = 4
   , learn = TRUE
 )
+#  methods:  'rjags', 'simple', 'interruptible', 'parallel', 'rjparallel', 
+#  'background', 'bgparallel' or 'snow'
 
 
 ## RUN 
