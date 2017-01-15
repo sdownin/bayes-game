@@ -320,12 +320,17 @@ getJ <- function(y,epsilon,gamma,c,B,f,J,dj)
 #
 #
 ##
-getG <- function(s,L,M,seed=1111)
+getG <- function(s,L,M,seed=1111, dist='binomial')
 {
   set.seed(seed)
   size <- min(M, length(s))
   s.sample <- sample(s,size,replace = F)
-  return( sapply(s.sample, function(s)rbinom(n=1, size = L, s)) )
+  G <- NA
+  if (dist=='binomial')
+    G <-  sapply(s.sample, function(s)rbinom(n=1, size = L, s))
+  else if (dist == 'poisson')
+    G <- sapply(s.sample, function(s)rpois(1, s*L))
+  return(G)
 }
 
 ##
@@ -577,13 +582,41 @@ getHeidConvDiag <- function(mcmc.output, eps=0.1, pvalue=0.05)
 #
 #
 ##
-getPrice <- function(k, x)
+getPrice <- function(k, x, t)
 {
-  epsilonTilde <- 1 + x$epsilon
+  beta <- 1 + x$epsilon
   if(k %in% c(1,'1'))
-    return( epsilonTilde*x$c1 )
+    return( beta*(x$c1 + x$sig1[t]*x$gamma1 ) ) # + x$sig1[t]*x$phi1
   if(k %in% c(2,'2'))
-    return( epsilonTilde*x$c2 )
+    return( beta*(x$c2 + x$sig2[t]*x$gamma2 ) )
+}
+
+##
+#
+##
+# getPriceFromCsrMarkup <- function(sig,epsilon,gamma,phiMarkup, c=1)
+# {
+#   basePrice <- (1+epsilon)*(c)
+#   phi <- phiMarkup*basePrice / (1+epsilon)
+#   return((1+epsilon)*(c + sig*gamma + sig*phi))
+# }
+
+getPriceFromCsrMarkup <- function(sig,epsilon,gamma,phiMarkup, c=1, verbose=FALSE)
+{
+  p0 <- (1+epsilon)*(c + sig*gamma)
+  price <- p0 * (1 + phiMarkup)
+  if(verbose) cat(sprintf('phi = %.3f\n',(price-p0)/(1+epsilon)))
+  return(price)
+}
+
+getPriceFromCsrMarkup <- function(sig,epsilon,gamma,phiMarkup, c=1, verbose=FALSE)
+{
+  ## IGNORE GAMMA USE PHIMARKUP AS COST `psi`
+  p0 <- c
+  basePrice <- p0 * (1 + phiMarkup)
+  price <- basePrice * (1+epsilon)
+  # if(verbose) cat(sprintf('phi = %.3f\n',(price-p0)/(1+epsilon)))
+  return(price)
 }
 
 ##

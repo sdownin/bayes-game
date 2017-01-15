@@ -5,23 +5,29 @@
 setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
 source(file.path(getwd(),'R','csr_bayes_game_main.R'))
 library(ggplot2)
+library(reshape2)
+library(lattice); library(latticeExtra)
+
+#  load(file = "l_list_5epsilons.RData")
+#  load(file = "l_list_7epsilons_only3finished.RData")
 
 #--------------------------------------------------------------------------------------
 ##  RUN MAIN GAME SIMULATION
 ##  USING GAME SETUP LIST X
 
-t1.change.pd <- 8              # platform 1 adds CSR policy at period
+t1.change.pd <- 6              # platform 1 adds CSR policy at period
+t2.change.pd <- 2
 Tau <- 10                      # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
-  , q= .27           # focal parameter
+  , q= .5           # focal parameter
   , epsilon = 1    # focal parameter
   , params=c('q')
-  , J1.0=50, J2.0=200  # secondary focal param
+  , J1.0=50, J2.0=250  # secondary focal param
   , p1.0=1, p2.0=1
   , v1= 1, v2=1
-  , db1=.5, db2=.5          ## 30% buy all (y/pk) goods from current platform 2; 70% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+  , db1=.5, db2=.5          ## (db1)% buy all (y/pk) goods from current platform 2; (1-db1)% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
   , dj1=.1, dj2=.1
   , c1=.5, c2=.5            ## seller MARGINAL cost
   , gamma1=.05, gamma2=.05  ## seller CSR cost
@@ -31,15 +37,15 @@ x <- list(t=1
   , r1=.1, r2=.1
   , omega=1
   , growth=.01
-  , Y=1000
-  , ep=1e-1
+  , Y=100
+  , ep=1
   , Tau=Tau
   , probs=c(.005,.025,.5,.975,.995)
   , learningThreshold=.05
-  , n.iter=1000
+  , n.iter=100
   , sig1=c(rep(0,t1.change.pd),rep(1,Tau-t1.change.pd))
-  , sig2=rep(1,Tau)
-  , t1.change=t1.change.pd, t2.change=0
+  , sig2=c(rep(0,t2.change.pd),rep(1,Tau-t2.change.pd))   #rep(1,Tau)
+  , t1.change=t1.change.pd, t2.change=t2.change.pd
   , cl.cutoff=0.7   # clustering between SS cutoff for 'learning' q
   , parallel = TRUE  
   , method = 'rjparallel'
@@ -51,10 +57,82 @@ x <- list(t=1
 
 
 ## RUN 
-l <- playCsrBayesGame(x)
+epsilons <- c(1,1.1,1.5,2) #c(0,.5,.9,1,1.1,1.5,2)
+l.list <- list()
+for (i in 1:length(epsilons)) {
+  x$epsilon <- epsilons[i]
+  l.list[[paste0('epsilon',x$epsilon)]] <- playCsrBayesGame(x)
+}
 
-par(mfrow=c(3,3)); for (i in 1:length(l$G$G1))hist(l$G$G1[[i]], col='lightgray')
+save.image("l_list_7epsilons.RData")
 
+# l <- playCsrBayesGame(x)
+
+# par(mfrow=c(3,3)); for (i in 1:length(l$G$G1)) hist(l$G$G1[[i]], col='lightgray')
+
+## Installed Base Share -----------------
+base <- ldply(l.list, function(l) {
+  l$B$period <- as.numeric(seq_len(nrow(l$B)))
+  l$B$B1share <- l$B$B1 / (l$B$B1 + l$B$B2)
+  return(l$B)
+}, .id = "epsilon")
+base[,1] <- stringr::str_replace_all(base[,1],"epsilon","")
+base_long <- melt(base, id.vars = c('epsilon','period'))
+##
+df <- subset(base_long, subset = ( !(variable %in% c('B1','B2'))))
+ggplot(aes(x=period, y=value, colour=epsilon), data=df) + geom_point() +
+  geom_line(lwd=1.1) + #facet_grid(variable ~ .)
+  geom_vline(xintercept=c(x$t1.change+.5,x$t2.change+.5)) +
+  ggtitle("Buyer Base Share") + theme_bw()
+
+## Seller Share -----------------
+sell <- ldply(l.list, function(l) {
+  l$J$period <- as.numeric(seq_len(nrow(l$J)))
+  l$J$J1share <- l$J$J1 / (l$J$J1 + l$J$J2)
+  return(l$J)
+}, .id = "epsilon")
+sell[,1] <- stringr::str_replace_all(sell[,1],"epsilon","")
+sell_long <- melt(sell, id.vars = c('epsilon','period'))
+##
+df <- subset(sell_long, subset = ( !(variable %in% c('J1','J2'))))
+ggplot(aes(x=period, y=value, colour=epsilon), data=df) + geom_point() +
+  geom_line(lwd=1.1) + #facet_grid(variable ~ .)
+  geom_vline(xintercept=c(x$t1.change+.5,x$t2.change+.5)) +
+  ggtitle("Seller Share") + theme_bw()
+
+
+
+
+
+## Installed Base Buyers -----------------
+base <- ldply(l.list, function(l) {
+  l$B$period <- as.numeric(seq_len(nrow(l$B)))
+  return(l$B)
+}, .id = "epsilon")
+base[,1] <- stringr::str_replace_all(base[,1],"epsilon","")
+base_long <- melt(base, id.vars = c('epsilon','period'))
+##
+ggplot(aes(x=period, y=value, colour=epsilon), data=base_long) + geom_line(lwd=1.1)  + facet_grid(variable ~ .)
+
+## Sellers  -----------------
+sell <- ldply(l.list, function(l) {
+  l$J$period <- as.numeric(seq_len(nrow(l$J)))
+  return(l$J)
+}, .id = "epsilon")
+sell[,1] <- stringr::str_replace_all(sell[,1],"epsilon","")
+sell_long <- melt(sell, id.vars = c('epsilon','period'))
+##
+ggplot(aes(x=period, y=value, colour=epsilon), data=sell_long) + geom_line(lwd=1.1)  + facet_grid(variable ~ .)
+
+
+
+
+par(mfrow=c(2,3))
+sapply(l.list, function(l) {
+  matplot(l$B, type='o',pch=16, main=sprintf('qepsilon = %s',l$epsilon.true))
+  abline(v=x$ti.change)
+})
+sapply(l.list, function(l)matplot(l$B, type='o',pch=16))
 
 
 ##----------- Test cluster identification by q size -------

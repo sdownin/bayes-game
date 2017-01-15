@@ -105,7 +105,8 @@ JAGS <- R6Class(
     }, 
     
     .runMcmc = function(data, inits)  {
-      model <- jags.model(textConnection(self$modelstring), data=data, inits=inits, n.adapt=self$config$n.adapt, n.chains=self$config$n.chains )
+      model <- jags.model(textConnection(self$modelstring), data=data, inits=inits, 
+                          n.adapt=self$config$n.adapt, n.chains=self$config$n.chains, thin=self$config$thin )
       set.seed(self$seed)
       update(model, n.iter=self$config$n.iter.update)
       mcmc.output <- coda.samples(model=model, variable.names=self$params, n.iter=self$config$n.iter.samples, thin=self$config$thin)
@@ -114,8 +115,9 @@ JAGS <- R6Class(
     
     .runMcmcParallel = function(data, inits, envir)   {
         rjout <- runjags::run.jags(self$modelstring, monitor=self$params, data=data, 
-                                   n.chains=self$config$n.chains, inits=inits, 
+                                   n.chains=self$config$n.chains, inits=inits,
                                    method=self$config$method,
+                                   thin=self$config$thin,
                                    adapt=ceiling(self$config$n.iter*.1),
                                    burnin=ceiling(self$config$n.iter*.4),
                                    sample=ceiling(self$config$n.iter))

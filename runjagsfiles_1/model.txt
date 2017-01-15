@@ -1,0 +1,11 @@
+model{
+for (i in 1:n) {
+z[i] ~ dbern(q)
+th1[i] <- p2*(v1 + omega*sig1*z[i])
+th2[i] <- p1*(v2 + omega*sig2*z[i])
+s[i] <- ((th1[i]/th2[i])*pow(J1, epsilon)) / ( (th1[i]/th2[i])*pow(J1, epsilon) + pow(J2, epsilon) )
+G[i] ~ dbinom( s[i], L )
+}
+q ~ dbeta(h1t,h2t)
+epsilon ~ dgamma(shapet,ratet)
+}

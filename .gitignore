@@ -1,0 +1,12 @@
+*.png*
+*.jpg*
+*.jpeg*
+*.png*
+*.pdf*
+*.csv*
+*.xls*
+*.xlsx*
+
+*.RData*
+.RData*
+

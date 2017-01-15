@@ -1,0 +1,42 @@
+Welcome to JAGS 4.2.0 on Tue Nov 08 22:45:48 2016
+JAGS is free software and comes with ABSOLUTELY NO WARRANTY
+Loading module: basemod: The specified module could not be found.
+Loading module: bugs: The specified module could not be found.
+. . Reading data file data.txt
+. Compiling model graph
+   Resolving undeclared variables
+RUNTIME ERROR:
+Compilation error on line 2.
+Unknown function: :
+Deleting model
+. Reading parameter file inits1.txt
+Can't set initial values. No model!
+. Reading parameter file inits2.txt
+Can't set initial values. No model!
+. Reading parameter file inits3.txt
+Can't set initial values. No model!
+. Reading parameter file inits4.txt
+Can't set initial values. No model!
+. Can't initialize. No model!
+. Adaptation skipped: model is not in adaptive mode.
+. Updating 1067
+-------------------------------------------------| 1050
+Can't update. No model!
+
+. Can't set monitor. No model!
+. Can't set monitor. No model!
+. Updating 2667
+-------------------------------------------------| 2650
+Can't update. No model!
+
+. No model
+. No model
+. No model
+. No model
+. Can't dump CODA output. No model!
+. Can't dump samplers. No model!
+. Updating 0
+Can't update. No model!
+Can't update. No model!
+. Deleting model
+. 
