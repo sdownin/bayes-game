@@ -1,8 +1,8 @@
-The CSR - CSR Link in Platform Competition
+Bayesian voting with the wallet
 ======
 
-*Learning Policy-Market Fit Through Dynamic Bayesian Games*
+*Strategic response to responsible consumption signals under network externalities*
 
-Dowing, S., and Kang, J.S. (2016)
+Dowing, S., and Kang, J.S. (2017)
 
-This mini-repo contains code for the manuscript to be submitted to Management Science.
+This repo contains code for simulations in the manuscript to be submitted to *Management Science*.
