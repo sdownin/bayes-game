@@ -3,7 +3,7 @@
 # CSR Bayes Game Main Simulation
 #
 ##
-setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
+setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
 source(file.path(getwd(),'R','csr_bayes_game_functions_2.R'))
 source(file.path(getwd(),'R','bvwg_r6_jags.R'))      # {.GLOBAL} JAGS
 
@@ -54,21 +54,21 @@ playCsrBayesGame <- function(x, ..., verbose=TRUE)
     for (t in 2:x$Tau) {
       l$t <- t
       if(verbose) cat(paste0('\nt: ',t,'\n'))
-      l <- updateGame(l, t)
+      l <- updateGame(x, l, t)
     }    
   }
   #--------------------------------- END MAIN GAME LOOP ---------------------------
   ## PLOTS
   if (x$learn) {
     for (param in x$params) {
-      true <- switch(param, 'q'=l$q.true, 'epsilon'=l$epsilon.true)
+      true <- switch(param, 'q'=l$q, 'epsilon'=l$epsilon)
       ciPlot(l$est[[param]], main=sprintf('MCMC Estimate for %s',param)); abline(v=x$t1.change);abline(h=true,col='gray')
     }
     ##cumuplot(na.omit(l$q.hat), main="q_hat Estimated from Inferred Z vector")
     hsummary <- sapply(1:nrow(l$h), function(i)quantile(rbeta(1000,l$h[i,1],l$h[i,2]),probs =l$probs))
-    ciPlot(t(hsummary), main="q Beta Posterior from Inferred Buyer Types (Z)",xlab="period"); abline(v=c(x$t1.change,x$t2.change));abline(h=l$q.true,col='gray')
+    ciPlot(t(hsummary), main="q Beta Posterior from Inferred Buyer Types (Z)",xlab="period"); abline(v=c(x$t1.change,x$t2.change));abline(h=l$q,col='gray')
   }
- return(l)
+  return(l)
 }
 
 ##
@@ -77,8 +77,8 @@ playCsrBayesGame <- function(x, ..., verbose=TRUE)
 ##
 initCsrBayesGameConfig <- function(x)
 {
-  l <- list( q.true=x$q
-             , epsilon.true=x$epsilon
+  l <- list( q=x$q
+             , epsilon=x$epsilon
              , M=rep(0,x$Tau)
              , sim=list()
              , p=data.frame(p1=rep(NA, x$Tau), p2=rep(NA, x$Tau))
@@ -94,7 +94,8 @@ initCsrBayesGameConfig <- function(x)
              , s.diff=rep(0,x$Tau)
              , q.hat=rep(NA,x$Tau)
              , bss=rep(NA,x$Tau)
-             , sig=data.frame(sig1=x$sig1, sig2=x$sig2)
+             , sig=data.frame(sig1=c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change)),
+                              sig2=c(rep(0,x$t2.change),rep(1,x$Tau-x$t2.change)))
              , phi=data.frame(phi1=rep(NA,x$Tau),phi2=rep(NA,x$Tau))
              , Q=data.frame(Q1=rep(0,x$Tau),Q2=rep(0,x$Tau))
              , Pi=data.frame(Pi1=rep(0,x$Tau),Pi2=rep(0,x$Tau))
@@ -129,12 +130,12 @@ initCsrBayesGameConfig <- function(x)
   l$J$J2[t] <- x$J2.0
   l$B$B1[t] <- 4 * l$J$J1[t]
   l$B$B2[t] <- 4 * l$J$J2[t]
-  l$p$p1[t] <- getPriceFromCsrMarkup(l$sig$sig1[t],l$epsilon.true,l$gamma$gamma1[t],l$phi$phi1[t], x$c1)   #getPrice(1, x, t)
-  l$p$p2[t] <- getPriceFromCsrMarkup(l$sig$sig2[t],l$epsilon.true,l$gamma$gamma2[t],l$phi$phi2[t], x$c2)  #getPrice(2, x, t)
+  l$p$p1[t] <- getPriceFromCsrMarkup(l$sig$sig1[t],l$epsilon,l$gamma$gamma1[t],l$phi$phi1[t], x$c1)   #getPrice(1, x, t)
+  l$p$p2[t] <- getPriceFromCsrMarkup(l$sig$sig2[t],l$epsilon,l$gamma$gamma2[t],l$phi$phi2[t], x$c2)  #getPrice(2, x, t)
   l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
   l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
   l$M[t] <- round(x$db1*l$B$B1[t] + x$db2*l$B$B2[t])
-  l$z[[t]] <- rbinom(l$M[t], 1, l$q.true)  ##  CHANGING TO GROUND TRUTH  q
+  l$z[[t]] <- rbinom(l$M[t], 1, l$q)  ##  CHANGING TO GROUND TRUTH  q
   l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
   l$L$L2[t] <- ceiling(x$Y / l$p$p2[t])
   
@@ -161,21 +162,20 @@ initCsrBayesGameConfig <- function(x)
 #
 #
 ##
-updateGame <- function(l, t)
+updateGame <- function(x, l, t)
 {
   ## CSR CONTINGENT COSTS
   l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1, x$gamma1, 0)
   l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
-  l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, x$psi1, 0)
-  l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, x$psi2, 0)
   
   ## PERIOD PARAMETERS
-  l$p$p1[t] <- getPriceFromCsrMarkup(l$sig$sig1[t],l$epsilon.true,l$gamma$gamma1[t],l$phi$phi1[t], x$c1)   #getPrice(1, x, t)
-  l$p$p2[t] <- getPriceFromCsrMarkup(l$sig$sig2[t],l$epsilon.true,l$gamma$gamma2[t],l$phi$phi2[t], x$c2)
+  l$p$p1[t] <- getPriceFromCsrMarkup(l$sig$sig1[t],l$epsilon,l$gamma$gamma1[t],l$phi$phi1[t], x$c1)   #getPrice(1, x, t)
+  l$p$p2[t] <- getPriceFromCsrMarkup(l$sig$sig2[t],l$epsilon,l$gamma$gamma2[t],l$phi$phi2[t], x$c2)
   l$f$f1[t] <- 1
   l$f$f2[t] <- 1
   l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
   l$L$L2[t] <- ceiling(x$Y / l$p$p2[t])
+  
   ## PREVIOS PERIOD DEPENDENT UPDATES
   m.temp <- round( x$db1*l$B$B1[t-1] + x$db2*l$B$B2[t-1] )
   l$M[t] <- ifelse( m.temp <= 1, 1, m.temp)
@@ -186,8 +186,13 @@ updateGame <- function(l, t)
   l$B$B1[t] <- getB(s1.avg, l$M[[t]], l$B$B1[t-1], x$db1)         
   l$B$B2[t] <- getB(s2.avg, l$M[[t]], l$B$B2[t-1], x$db2) 
   
+  ## CSR-Price-Base-CONTINGENT COSTS
+  #cat(sprintf("getPsi: %.10f\n", getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]) ))
+  l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
+  l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
+  
   # SAMPLE MARKET ATTITUDES
-  l$z[[t]] <- rbinom(l$M[t],1, l$q.true)
+  l$z[[t]] <- rbinom(l$M[t],1, l$q)
   
   # LIST demand share
   l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
@@ -197,11 +202,11 @@ updateGame <- function(l, t)
                     x$omega, l$z[[t]],
                     x$epsilon, k=1)
   l$s.base <- share.base(l$p$p1[t], l$p$p2[t], 
-                    x$v1, x$v2,
-                    l$sig$sig1[t], l$sig$sig2[t],
-                    l$J$J1[t], l$J$J2[t],
-                    x$omega, l$z[[t]],
-                    x$epsilon, k=1)
+                         x$v1, x$v2,
+                         l$sig$sig1[t], l$sig$sig2[t],
+                         l$J$J1[t], l$J$J2[t],
+                         x$omega, l$z[[t]],
+                         x$epsilon, k=1)
   l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t],dist = l$Gdist)
   l$G$G2[[t]] <- getG(1-l$s[[t]], l$L$L2[t], l$M[t], dist=l$Gdist)
   
@@ -270,8 +275,8 @@ learnBayesParams <- function(x,l,t)
     data$shapet <- l$shape[t]
     data$ratet <- l$rate[t] 
   }
-  if ( !('epsilon' %in% x$params) ) data$epsilon <- l$epsilon.true
-  if ( !('q' %in% x$params)       ) data$q <- l$q.true
+  if ( !('epsilon' %in% x$params) ) data$epsilon <- l$epsilon
+  if ( !('q' %in% x$params)       ) data$q <- l$q
   
   ##
   # l$param.inits <- list()
@@ -342,21 +347,24 @@ getCsrBayesGameSummaryPlots <- function(x,l)
 
 
 #-------------------------------------------------------------------------------------
-separateParamCols <- function(df, paramCol="param_value") {
+separateParamCols <- function(df, id.vars, paramCol="param_value") {
   x <- as.character(df[ ,paramCol])
   param.df <- ldply(str_split(str_replace_all(x, "[a-zA-Z]", ""), "_"))
   names(param.df) <- unlist(str_split(str_replace_all(x[1], "[\\d.]", ""), "_"))
   df <- cbind(df[,which(!(names(df) %in% paramCol))], param.df)
   return(df)
 }
+
 getBasePlotDf <- function(l.list, id.vars = c('q','epsilon','db','period')) {
   base <- ldply(l.list, function(l) {
     l$B$period <- as.numeric(seq_len(nrow(l$B)))
     l$B$B1share <- l$B$B1 / (l$B$B1 + l$B$B2)
+    for(var in names(l$params)) 
+      l$B[ ,var] <- l$params[var]
     return(l$B)
   }, .id = "param_value")
-  df <- separateParamCols(base, "param_value")
-  base_long <- melt(df, id.vars = id.vars)
+  df <- base[,which(!(names(base) %in% "param_value"))]
+  base_long <- melt(df,measure.vars = 'B1share',  id.vars = id.vars)
   ##
   df <- subset(base_long, subset = ( !(variable %in% c('B1','B2'))))
   return(df)
@@ -404,17 +412,17 @@ getModelStr <- function(params, dist, vars=c()) {
   )
   str <- 
     "model{
-    for (i in 1:n) {
-    z[i] ~ dbern(q)
-    th1[i] <- p2*(v1 + omega*sig1*z[i])
-    th2[i] <- p1*(v2 + omega*sig2*z[i])
-    s[i] <- ((th1[i]/th2[i])*pow(J1, epsilon)) / ( (th1[i]/th2[i])*pow(J1, epsilon) + pow(J2, epsilon) )
-    G[i] ~ %s
-    }
-    %s
-  }"
+  for (i in 1:n) {
+  z[i] ~ dbern(q)
+  th1[i] <- p2*(v1 + omega*sig1*z[i])
+  th2[i] <- p1*(v2 + omega*sig2*z[i])
+  s[i] <- ((th1[i]/th2[i])*pow(J1, epsilon)) / ( (th1[i]/th2[i])*pow(J1, epsilon) + pow(J2, epsilon) )
+  G[i] ~ %s
+  }
+  %s
+}"
   return( sprintf(str, Gdist, paste(vars, collapse="\n")) )
-}
+  }
 
 
 

@@ -25,9 +25,9 @@ library(doParallel)
 ##  USING GAME SETUP LIST x
 
 ## Set strategy change periods and total simulation length
-t1.change.pd <- 5            # platform 1 adds CSR policy at period
-t2.change.pd <- 2              # platform 2 adds CSR policy at period
-Tau <- 12                    # number of periods
+#t1.change.pd <- 5            # platform 1 adds CSR policy at period
+t2.change.pd <- 2            # platform 2 adds CSR policy at period
+Tau <- 1000 + t2.change.pd   # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
@@ -70,26 +70,31 @@ x <- list(t=1
 #---------------------------------------------------------------------
 
 qs <- c(0,.2,.4,.6,.8,1)   #seq(0,1,.1)
-epsilons <- c(.4,1.05,1.7)  #
-dbs <-  c(0.05, 0.1, 0.2) #c(.05,.5)
-phis <- c(0.02, 0.1, 0.5)   # CSR cost-base price increase
-l.list <- list()
+epsilons <- c(.5,1.05,1.6)  #
+dbs <-  c(.2) # c(0.05, 0.1, 0.2) #c(.05,.5)
+phis <- c(.02) # c(0.02, 0.1, 0.5)   # CSR cost-base price increase
+t1.changes <- c(10, 50, 250) 
+l.list <- list()   #testing:#    i = j = k = l = m = 1
 for (i in 1:length(qs)) {
   for (j in 1:length(epsilons)) {
     for (k in 1:length(dbs)) {
       for (l in 1:length(phis)) {
-        params <- list(q=qs[i], 
-                    epsilon=epsilons[j], 
-                    db=dbs[k], 
-                    phi=phis[l])
-        print(sapply(names(params),function(name)sprintf("%s",params[name])))
-        x$q <- qs[i]
-        x$epsilon <- epsilons[j]
-        x$db1 <- x$db2 <- dbs[k]
-        x$phi1 <- x$phi2 <- phis[l]
-        index <- paste0("q",x$q,"_epsilon",x$epsilon,"_db",x$db1,"_phi",x$phi1)
-        l.list[[index]] <- playCsrBayesGame(x, verbose = FALSE)  
-        l.list[[index]]$params <- params   
+        for (m in 1:length(t1.changes)) {
+          params <- list( q=qs[i], 
+                          epsilon=epsilons[j], 
+                          db=dbs[k], 
+                          phi=phis[l], 
+                          t1.change=t1.changes[m])
+          print(sapply(names(params),function(name)sprintf("%s",params[name])))
+          x$q <- qs[i]
+          x$epsilon <- epsilons[j]
+          x$db1 <- x$db2 <- dbs[k]
+          x$phi1 <- x$phi2 <- phis[l]
+          x$t1.change <- t1.changes[m]
+          index <- paste0("q",x$q,"_epsilon",x$epsilon,"_db",x$db1,"_phi",x$phi1,"_t1.change",x$t1.change)
+          l.list[[index]] <- playCsrBayesGame(x, verbose = FALSE)  
+          l.list[[index]]$params <- params
+        }
       }
     }
   }
@@ -105,29 +110,47 @@ for (i in 1:length(qs)) {
 
 ##--------- PLOT BUYER SHARE -------------------------
 
-## subset data to plot
-df <- getBasePlotDf(l.list, id.vars=c('q','epsilon','db','phi','period'))
-db_i <- "0.2"   # 0.05, 0.1, 0.2
-phi_i <- c("0.02","0.1","0.5")
+## choose params to display
+db_i <- "0.2"   # "0.05", "0.1", "0.2"
+phi_i <- "0.02" # c("0.02","0.1","0.5")
+## subset data by chosen params
+df <- getBasePlotDf(l.list, id.vars=c(names(l.list[[1]]$params), 'period') )
 df <- subset(df, subset=(db %in% db_i & phi %in% phi_i))
 
+## set numerics to factors for plotting
+for(var in names(l.list[[1]]$params))
+  df[,var] <- as.factor(df[,var])
+
+## subset dataframe for geom_point characters
+if (length(unique(df$period))>40) {
+  df.point <- subset(df, period %% floor(max(df$period)/20) == 1)
+} else {
+  df.point <- df
+}
+
 ## prepare plotting arguments
-colourCount = length(unique(df$q))
+nPeriods <- length(unique(df$period))
+ncols <- length(epsilons)
+xintercepts2 <- l.list[[1]]$t2.change+1
+xintercepts1 <- data.frame(z = rep(as.numeric(levels(df$t1.change)), each=ncols), 
+                           t1.change = rep(t1.changes, each=ncols), 
+                           epsilon = rep(epsilons, ncols) )
+colourCount <- length(unique(df$q))
 db_num <- as.numeric(db_i)
 db_lab <- ifelse(db_num < 0.1, 'Low',ifelse(db_num < 0.2, 'Moderate','High'))
 # getPalette = colorRampPalette(brewer.pal(9, "Set1"))
-gglty <- rep(c(2,1), length(unique(df$phi))*length(unique(df$epsilon)) )
 
 ## GGPLOT object
 gg <- ggplot(aes(x=period, y=value, colour=q), data=df) + 
-  scale_x_log10() +
   geom_line(aes(colour=q,group=q,lty=q), lwd=1.1) + 
-  facet_grid(phi ~ epsilon) + 
-  geom_point(aes(pch=q), data=subset(df, period %% floor(max(df$period)/20) == 1)) + 
+  facet_grid(t1.change ~ epsilon) + 
+  geom_point(aes(pch=q), data=df.point) + 
   scale_color_manual(values=colorRamps::matlab.like(colourCount)) +
-  geom_vline(xintercept=c(l.list[[1]]$t1.change+1,l.list[[1]]$t2.change+1),lty=gglty) +
+  geom_vline(xintercept=xintercepts2, lty=1) +
+  geom_vline(aes(xintercept=z), xintercepts1, lty=2) +
+  scale_x_log10() + ylim(0,1) +
   ggtitle(sprintf('%s Churn (%.2f)',db_lab,db_num)) + 
-  ylab("Buyer Share") + xlab('Period') + theme_bw()
+  ylab("Buyer Share") + xlab(expression('Period ('*log[10]~scale*')')) + theme_bw()
 gg  ## display plot
 
 ## save plot
