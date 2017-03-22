@@ -11,7 +11,7 @@ library(random)
 library(foreach)
 library(snow)
 
-setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\csr_bayes_game')
+setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
 
 
 #--------------------------- FUNCTIONS -----------------------------------------

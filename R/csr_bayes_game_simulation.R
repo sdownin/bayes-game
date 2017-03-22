@@ -25,9 +25,9 @@ library(doParallel)
 ##  USING GAME SETUP LIST x
 
 ## Set strategy change periods and total simulation length
-t1.change.pd <- 5            # platform 1 adds CSR policy at period
-t2.change.pd <- 2              # platform 2 adds CSR policy at period
-Tau <- 12                    # number of periods
+t2.change.pd <- 2                   # platform 2 adds CSR policy at period
+t1.change.pd <- 100 + t2.change.pd  # platform 1 adds CSR policy at period
+Tau <- 1000 + t2.change.pd          # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
@@ -69,11 +69,13 @@ x <- list(t=1
 #----------------- Multi-Param Simulation  ---------------------------
 #---------------------------------------------------------------------
 
-qs <- c(0,.2,.4,.6,.8,1)   #seq(0,1,.1)
-epsilons <- c(.4,1.05,1.7)  #
-dbs <-  c(0.05, 0.1, 0.2) #c(.05,.5)
-phis <- c(0.02, 0.1, 0.5)   # CSR cost-base price increase
 l.list <- list()
+
+qs <- c(0,.2,.4,.6,.8,1)   #seq(0,1,.1)
+epsilons <- c(.5,1.05,1.6)  #
+dbs <-  c(0.05, 0.1, 0.2) #c(.05,.5)
+phis <- c(0.02, 0.1, 0.4)   # CSR cost-base price increase
+
 for (i in 1:length(qs)) {
   for (j in 1:length(epsilons)) {
     for (k in 1:length(dbs)) {
@@ -98,45 +100,128 @@ for (i in 1:length(qs)) {
 # ## UNCOMMENT to SAVE binary (.RData) data file
 # ## load saved binary file as follows:
 # ## load('filename.RData')
-# image.file <- sprintf('l_list_facet_plot_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"))
-# save.image(image.file)
+image.file <- sprintf('l_list_facet_plot_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"))
+save.image(image.file)
 
 
 
-##--------- PLOT BUYER SHARE -------------------------
+##--------- PLOT BUYER SHARE - SET ONE VALUE OF CHURN -------------------------
 
 ## subset data to plot
 df <- getBasePlotDf(l.list, id.vars=c('q','epsilon','db','phi','period'))
 db_i <- "0.2"   # 0.05, 0.1, 0.2
-phi_i <- c("0.02","0.1","0.5")
+phi_i <- c("0.02","0.1","0.4")
 df <- subset(df, subset=(db %in% db_i & phi %in% phi_i))
+
+## set numerics to factors for plotting
+for(var in names(l.list[[1]]$params))
+  df[,var] <- as.factor(df[,var])
+
+## subset dataframe for geom_point characters
+if (length(unique(df$period))>40) {
+  df.point <- subset(df, period %% floor(max(df$period)/20) == 1)
+} else {
+  df.point <- df
+}
 
 ## prepare plotting arguments
 colourCount = length(unique(df$q))
 db_num <- as.numeric(db_i)
 db_lab <- ifelse(db_num < 0.1, 'Low',ifelse(db_num < 0.2, 'Moderate','High'))
-# getPalette = colorRampPalette(brewer.pal(9, "Set1"))
 gglty <- rep(c(2,1), length(unique(df$phi))*length(unique(df$epsilon)) )
+
+# labeller = list(epsilon=sapply(epsilons, function(x)sprintf("epsilon=%s",x)),
+#                 phi=sapply(phis, function(x)sprintf("phi=%s",x)))
+# names(labeller$epsilon) <- epsilons
+# names(labeller$phi) <- phis
+labels.epsilon <- sapply(epsilons, function(x)sprintf("Network Effect = %s",x))
+labels.phi <- sapply(phis, function(x)sprintf("CSR Price Premium = %s",x))
+names(labels.epsilon) <- epsilons
+names(labels.phi) <- phis
+labels <- c(labels.epsilon, labels.phi)
+
+# legend guide
+legend.guide <- guide_legend(title="Hedonic\nProportion\n(q)")
 
 ## GGPLOT object
 gg <- ggplot(aes(x=period, y=value, colour=q), data=df) + 
   scale_x_log10() +
   geom_line(aes(colour=q,group=q,lty=q), lwd=1.1) + 
-  facet_grid(phi ~ epsilon) + 
-  geom_point(aes(pch=q), data=subset(df, period %% floor(max(df$period)/20) == 1)) + 
+  facet_grid(phi ~ epsilon, labeller = as_labeller(labels)) + 
+  geom_point(aes(pch=q), data=df.point) + 
   scale_color_manual(values=colorRamps::matlab.like(colourCount)) +
   geom_vline(xintercept=c(l.list[[1]]$t1.change+1,l.list[[1]]$t2.change+1),lty=gglty) +
   ggtitle(sprintf('%s Churn (%.2f)',db_lab,db_num)) + 
-  ylab("Buyer Share") + xlab('Period') + theme_bw()
+  ylab("Buyer Share") + xlab(expression('Time Period ('*log[10]~scale*')')) + 
+  guides(color=legend.guide, group=legend.guide,lty=legend.guide,pch=legend.guide) +
+  theme_bw() 
 gg  ## display plot
 
 ## save plot
 file.name <- sprintf("buyer_base_share_PRICE_not_log_J1_%s_J2_%s_t1_%s_t2_%s_T%s_db_%s_omega_%s.png", x$J1.0, x$J2.0,x$t1.change,x$t2.change,x$Tau,db_i,x$omega)
 ggsave(file.name, gg, height=8, width=12, units='in')
 
+##----------- No title figure for article ----------------------------
+## GGPLOT object
+gg <- ggplot(aes(x=period, y=value, colour=q), data=df) + 
+  scale_x_log10() +
+  geom_line(aes(colour=q,group=q,lty=q), lwd=1.1) + 
+  facet_grid(phi ~ epsilon, labeller = as_labeller(labels)) + 
+  geom_point(aes(pch=q), data=df.point) + 
+  scale_color_manual(values=colorRamps::matlab.like(colourCount)) +
+  geom_vline(xintercept=c(l.list[[1]]$t1.change+1,l.list[[1]]$t2.change+1),lty=gglty) +
+  ylab("Buyer Share") + xlab(expression('Time Period ('*log[10]~scale*')')) +
+  guides(color=legend.guide, group=legend.guide,lty=legend.guide,pch=legend.guide) +
+  theme_bw() 
+gg  ## display plot
+
+## save plot
+file.name <- sprintf("buyer_base_share_PRICE_6p5-10_not_log_J1_%s_J2_%s_t1_%s_t2_%s_T%s_db_%s_omega_%s.png", x$J1.0, x$J2.0,x$t1.change,x$t2.change,x$Tau,db_i,x$omega)
+ggsave(file.name, gg, height=6.5, width=10, units='in')
+##------------------------------------------------------------
 
 
 
+##--------- PLOT BUYER SHARE - SET ONE VALUE OF CSR PRICE PREMIUM -------------------------
+
+## subset data to plot
+df <- getBasePlotDf(l.list, id.vars=c('q','epsilon','db','phi','period'))
+db_i <- c("0.05", "0.1", "0.2")
+phi_i <- "0.02" # c("0.02","0.1","0.5")
+df <- subset(df, subset=(db %in% db_i & phi %in% phi_i))
+
+## set numerics to factors for plotting
+for(var in names(l.list[[1]]$params))
+  df[,var] <- as.factor(df[,var])
+
+## subset dataframe for geom_point characters
+if (length(unique(df$period))>40) {
+  df.point <- subset(df, period %% floor(max(df$period)/20) == 1)
+} else {
+  df.point <- df
+}
+
+## prepare plotting arguments
+colourCount = length(unique(df$q))
+phi_num <- as.numeric(phi_i)
+phi_lab <- ifelse(phi_num < 0.1, 'Low',ifelse(phi_num < 0.2, 'Moderate','High'))
+gglty <- rep(c(2,1), length(unique(df$db))*length(unique(df$epsilon)) )
+
+## GGPLOT object
+gg <- ggplot(aes(x=period, y=value, colour=q), data=df) + 
+  scale_x_log10() +
+  geom_line(aes(colour=q,group=q,lty=q), lwd=1.1) + 
+  facet_grid(db ~ epsilon) + 
+  geom_point(aes(pch=q), data=df.point) + 
+  scale_color_manual(values=colorRamps::matlab.like(colourCount)) +
+  geom_vline(xintercept=c(l.list[[1]]$t1.change+1,l.list[[1]]$t2.change+1),lty=gglty) +
+  ggtitle(sprintf('%s Price Premium (%.2f)',phi_lab,phi_num)) + 
+  ylab("Buyer Share") + xlab(expression('Time Period ('*log[10]~scale*')')) + theme_bw()
+gg  ## display plot
+
+## save plot
+file.name <- sprintf("buyer_base_share_CHURN_not_log_J1_%s_J2_%s_t1_%s_t2_%s_T%s_phi_%s_omega_%s.png", x$J1.0, x$J2.0,x$t1.change,x$t2.change,x$Tau,phi_i,x$omega)
+ggsave(file.name, gg, height=8, width=12, units='in')
 
 
 # ##----------- SELLER SHARE --------------------------

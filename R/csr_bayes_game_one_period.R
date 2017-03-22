@@ -7,7 +7,7 @@ qpost <- function(W,N=50,a1=0.5,a2=0.5,theta=0.5) ## W = sum of votes with walle
 {
   y2 <- W + a2
   y1 <- N - W + a1
-  z <- seq(0,1,.005)
+  z <- seq(0,1,.001)
   qW <- dbeta(z,y2,y1)
   qA <- dbeta(z,y1,y2)
   # qWqA <- qW * theta + qA * (1-theta)
@@ -60,43 +60,48 @@ for (i in seq_along(wvec)) {
 
 
 ## MANY VOTES WITH WALLET
-par(mfrow=c(1,2), mar=c(4.5,4.5,4.5,1.5), oma=c(0,0,2,0))
-wvec <- c(2,6)
-adjs <- c(.4,.1)
-frames <- c('(a) No CSR','(b) CSR')
-for (i in seq_along(wvec)) {
-  # W <- 2
-  W <- wvec[i]
-  N <- 10
-  y <- qpost(W, N, a1=.5,a2=.5)
-  x <- seq(0,1,length.out = nrow(y))
-  colors <- c(4,'darkgray')
-  # mainstr <- sprintf('%s  N = %s, h = %s',frames[i],N,W)
-  mainstr <- frames[i]
-  matplot(x, y, main=mainstr,
-          xlab = 'Proportion of Hedonic Buyers', 
-          ylab = expression('Posterior Hedonic Prob. '*(q^post)),
-          type='o', pch=c(NA), lwd=2:1, lty=1,col=colors)
-  qstar <- 1/2
-  abline(v=qstar, lty=2)
-  mtext(text = expression(q^"*"), at=qstar, side = 3, cex=.9, padj = .0)
-  qWx <- y$qW* x
-  meanqW <- mean( qWx[qWx>-Inf&qWx<Inf], na.rm = T )
-  cat(sprintf('\nN=%s, W=%s, mean(qW) = %.3f\n',N,W,meanqW))
-  abline(v=meanqW, lty=4)
-  mtext(text = expression(hat(q)==E[X]*(q^post)), 
-        at=meanqW, side = 3, cex=.9, adj=adjs[i],  padj = .0)
-  leg.loc <- ifelse(W/N < .5, 'topright', 'topleft')
-  legend(leg.loc,legend=c(expression(q^post)
-                          #,expression(q^A)
-                          #, expression(E[sigma^b==(W*","*A)]*q),
-                          #, expression(q^A -q^W)
-                          #,sprintf('h = %s',W),sprintf('N = %s',N)
-  ),
-  title=sprintf('%s votes (%s/%s)',ifelse(W/N>.35,'many','few'),W,N),
-  pch=c(NA),lwd=c(2),lty=c(1),col=c(4))
-}; mtext("Best Response to Observed Buyers Voting with the Wallet", outer=T, cex=1.5)
-
+png('best_response_to_observed_buying_with_wallet.png', height=4.5, width=8.8, units='in', res=300)
+  par(mfrow=c(1,2), mar=c(4.5,4.5,4.5,1.5), oma=c(0,0,2,0))
+  wvec <- c(1,7)
+  adjs <- c(.4,.1)
+  frames <- c('(a) No CSR','(b) CSR')
+  for (i in seq_along(wvec)) {
+    # W <- 2
+    W <- wvec[i]
+    N <- 10
+    y <- qpost(W, N, a1=.5,a2=.5)
+    x <- seq(0,1,length.out = nrow(y))
+    colors <- c(4,'darkgray')
+    # mainstr <- sprintf('%s  N = %s, h = %s',frames[i],N,W)
+    mainstr <- frames[i]
+    matplot(x, y, 
+            main=mainstr,
+            xlab = 'Proportion of Hedonic Buyers', 
+            ylab = 'Density',
+            type='o', pch=c(NA), lwd=2:1, lty=1,col=colors)
+    qstar <- 1/2
+    abline(v=qstar, lty=1)
+    mtext(text = expression(q*"*"), at=qstar, side = 3, cex=.9, padj = .0)
+    qWx <- y$qW* x
+    meanqW <- mean( qWx[qWx>-Inf&qWx<Inf], na.rm = T )
+    cat(sprintf('\nN=%s, W=%s, mean(qW) = %.3f\n',N,W,meanqW))
+    abline(v=meanqW, lty=4)
+    mtext(text = expression(hat(q)==E[X]*(q^post)), 
+          at=meanqW, side = 3, cex=.9, adj=adjs[i],  padj = .0)
+    polygon(x=x, y=y$qW, col=rgb(.2,.2,.8,.2))
+    leg.loc <- ifelse(W/N < .5, 'topright', 'topleft')
+    legend(leg.loc,legend=c(expression(q^post)
+                            , expression(q*'*')
+                            , expression(hat(q))
+                            #,expression(q^A)
+                            #, expression(E[sigma^b==(W*","*A)]*q),
+                            #, expression(q^A -q^W)
+                            #,sprintf('h = %s',W),sprintf('N = %s',N)
+          ),
+          title=sprintf('%s votes (%s/%s)',ifelse(W/N>.35,'Many','Few'),W,N),
+          pch=c(NA),lwd=c(3,1,1),lty=c(1,1,4),col=c(4,1,1))
+  }; #mtext("Best Response to Observed Buyers Voting with the Wallet", outer=T, cex=1.5)
+dev.off()
 
 ##------------------------------------------------------
 getPriceNox <- function(sig,epsilon,gamma,phi)
