@@ -27,14 +27,15 @@ library(doParallel)
 ## Set strategy change periods and total simulation length
 #t1.change.pd <- 5            # platform 1 adds CSR policy at period
 t2.change.pd <- 2            # platform 2 adds CSR policy at period
-Tau <- 1000 + t2.change.pd   # number of periods
+Tau <- 100 + t2.change.pd   # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
           , q= .5              ## hedonic probability by nature (proportion)
           , epsilon = 1        ## indirect network effects
           , params=c('q')      ## parmeters to be 'learned' by gibbs sampling
-          , J1.0=200, J2.0=50  ## Initial sellers on platforms
+          , J1.0=100000, J2.0=10000  ## Initial sellers on platforms
+          , B1.0=40000000, B2.0=2100000
           #, p1.0=1, p2.0=1    ## price  *MOVED* to be set dynamically as function of CSR policy
           , v1= 1, v2=1        ## utilitarian value
           , omega=2  ##        ## hedonic value
@@ -71,11 +72,11 @@ x <- list(t=1
 
 l.list <- list()   #testing:#    i = j = k = l = m = 1
 
-qs <- c(0,.2,.4,.6,.8,1)   #seq(0,1,.1)
+qs <- c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
 epsilons <- c(.5,1.05,1.6)  #
-dbs <-  c(0.05, 0.1, 0.2) #c(.05,.5)
-phis <- c(0.02, 0.1, 0.5)   # CSR cost-base price increase
-t1.changes <- c(20, 40, 80, 320) # c(10, 30, 90) 
+dbs <-  0.05 # c(0.05, 0.1, 0.2) #c(.05,.5)
+phis <- 0.1  # c(0.02, 0.1, 0.5)   # CSR cost-base price increase
+t1.changes <- c(10, 30, 90) 
 
 for (i in 1:length(qs)) {
   for (j in 1:length(epsilons)) {
@@ -94,7 +95,15 @@ for (i in 1:length(qs)) {
           x$phi1 <- x$phi2 <- phis[l]
           x$t1.change <- t1.changes[m]
           index <- paste0("q",x$q,"_epsilon",x$epsilon,"_db",x$db1,"_phi",x$phi1,"_t1.change",x$t1.change)
-          l.list[[index]] <- playCsrBayesGame(x, verbose = FALSE)  
+          ##
+          ##
+          ## TODO: - change z sample from (N x Bernoulli(p)) vector
+          ##          to 1 x Binom(N,P)
+          ##      - change share() from N x s(z) --> [k, N-k]
+          ##          to [k x s(z=1), N-k x s(z=0) ]
+          ##
+          ##
+          l.list[[index]] <- playCsrBayesGame(x, verbose = T)  
           l.list[[index]]$params <- params
         }
       }
@@ -105,7 +114,7 @@ for (i in 1:length(qs)) {
 # ## UNCOMMENT to SAVE binary (.RData) data file
 # ## load saved binary file as follows:
 # ## load('filename.RData')
-image.file <- sprintf('l_list_facet_plot_PERIOD_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s_t1_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"),paste(t1.changes,collapse="-"))
+image.file <- sprintf('_uber_l_list_facet_plot_PERIOD_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s_t1_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"),paste(t1.changes,collapse="-"))
 save.image(image.file)
 
 
@@ -113,9 +122,9 @@ save.image(image.file)
 ##--------- PLOT BUYER SHARE -------------------------
 
 ## choose params to display
-db_i <- "0.2"   # "0.05", "0.1", "0.2"
+db_i <- "0.05"   # "0.05", "0.1", "0.2"
 phi_i <- "0.1" # c("0.02","0.1","0.5")
-t1.change_i <- c(20,40,80)
+t1.change_i <- c(10, 30, 90)
 ## subset data by chosen params
 df <- getBasePlotDf(l.list, id.vars=c(names(l.list[[1]]$params), 'period') )
 df <- subset(df, subset=(db %in% db_i & phi %in% phi_i & t1.change %in% t1.change_i))
@@ -190,7 +199,7 @@ gg <- ggplot(aes(x=period, y=value, colour=q), data=df) +
 gg  ## display plot
 
 ## save plot
-file.name <- sprintf("buyer_base_share_PERIOD_6p5-10_not_log_J1_%s_J2_%s_t1_%s_t2_%s_T%s_db_%s_phi_%s_omega_%s.png", x$J1.0, x$J2.0,paste(x$t1.change,collapse = "-"),x$t2.change,x$Tau,db_i,phi_i,x$omega)
+file.name <- sprintf("_uber_buyer_base_share_PERIOD_6p5-10_not_log_J1_%s_J2_%s_t1_%s_t2_%s_T%s_db_%s_phi_%s_omega_%s.png", x$J1.0, x$J2.0,paste(x$t1.change,collapse = "-"),x$t2.change,x$Tau,db_i,phi_i,x$omega)
 ggsave(file.name, gg, height=6.5, width=10, units='in')
 ##------------------------------------------------------------
 
@@ -214,13 +223,3 @@ ggsave(file.name, gg, height=6.5, width=10, units='in')
 #   ggtitle("Seller Share") + ylab("Seller Share") + theme_bw()
 # file.name <- sprintf("seller_share_face_db_epsilon_J1_%s_J2_%s_t1_%s_t2_%s_T%s.png", x$J1.0, x$J2.0,x$t1.change,x$t2.change,x$Tau)
 # ggsave(file.name, gg, height=8, width=16, units='in')
-
-
-
-
-
-
-
-
-
-

@@ -27,7 +27,7 @@ library(doParallel)
 ## Set strategy change periods and total simulation length
 t2.change.pd <- 2                   # platform 2 adds CSR policy at period
 t1.change.pd <- 100 + t2.change.pd  # platform 1 adds CSR policy at period
-Tau <- 1000 + t2.change.pd          # number of periods
+Tau <- 1500 + t2.change.pd          # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
@@ -74,7 +74,7 @@ l.list <- list()
 qs <- c(0,.2,.4,.6,.8,1)   #seq(0,1,.1)
 epsilons <- c(.5,1.05,1.6)  #
 dbs <-  c(0.05, 0.1, 0.2) #c(.05,.5)
-phis <- c(0.02, 0.1, 0.4)   # CSR cost-base price increase
+phis <- c(0.01, 0.1, 1.0)   # CSR cost-base price increase
 
 for (i in 1:length(qs)) {
   for (j in 1:length(epsilons)) {
@@ -110,7 +110,7 @@ save.image(image.file)
 ## subset data to plot
 df <- getBasePlotDf(l.list, id.vars=c('q','epsilon','db','phi','period'))
 db_i <- "0.2"   # 0.05, 0.1, 0.2
-phi_i <- c("0.02","0.1","0.4")
+phi_i <- c("0.01","0.1","1")
 df <- subset(df, subset=(db %in% db_i & phi %in% phi_i))
 
 ## set numerics to factors for plotting

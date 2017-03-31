@@ -9,4 +9,5 @@
 
 *.RData*
 .RData*
-
+.Rhistory
+.Rhistory*

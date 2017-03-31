@@ -87,7 +87,7 @@ initCsrBayesGameConfig <- function(x)
              , f=data.frame(f1=rep(1,x$Tau), f2=rep(1,x$Tau))
              , O=data.frame(O1=rep(1,x$Tau), O2=rep(1,x$Tau))
              , J=data.frame(J1=rep(0,x$Tau),J2=rep(0,x$Tau))
-             , B=data.frame(B1=rep(0,x$Tau),B2=rep(0,x$Tau))
+             , B=data.frame(B1=rep(NA,x$Tau),B2=rep(NA,x$Tau))
              , h=data.frame(h1=rep(0,x$Tau),h2=rep(0,x$Tau))
              , shape=rep(0,x$Tau)
              , rate=rep(0,x$Tau)
@@ -128,8 +128,8 @@ initCsrBayesGameConfig <- function(x)
   ## Initial values
   l$J$J1[t] <- x$J1.0
   l$J$J2[t] <- x$J2.0
-  l$B$B1[t] <- 4 * l$J$J1[t]
-  l$B$B2[t] <- 4 * l$J$J2[t]
+  l$B$B1[t] <- ifelse('B1.0' %in%names(x), x$B1.0, 4 * l$J$J1[t])
+  l$B$B2[t] <- ifelse('B2.0' %in%names(x), x$B2.0, 4 * l$J$J2[t])
   l$p$p1[t] <- getPriceFromCsrMarkup(l$sig$sig1[t],l$epsilon,l$gamma$gamma1[t],l$phi$phi1[t], x$c1)   #getPrice(1, x, t)
   l$p$p2[t] <- getPriceFromCsrMarkup(l$sig$sig2[t],l$epsilon,l$gamma$gamma2[t],l$phi$phi2[t], x$c2)  #getPrice(2, x, t)
   l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
