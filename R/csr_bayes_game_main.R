@@ -95,11 +95,11 @@ initCsrBayesGameConfig <- function(x)
              , q.hat=rep(NA,x$Tau)
              , bss=rep(NA,x$Tau)
              , sig=data.frame(sig1=c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change)),
-                              sig2=c(rep(0,x$t2.change),rep(1,x$Tau-x$t2.change)))
+                              sig2=c(rep(0,x$t2.change),rep(1,x$Tau-x$t2.change)) )
              , phi=data.frame(phi1=rep(NA,x$Tau),phi2=rep(NA,x$Tau))
              , Q=data.frame(Q1=rep(0,x$Tau),Q2=rep(0,x$Tau))
              , Pi=data.frame(Pi1=rep(0,x$Tau),Pi2=rep(0,x$Tau))
-             , z=list()  
+             , Z=data.frame(H=rep(NA,x$Tau),U=rep(NA,x$Tau))
              , s=list() 
              , G=list(G1=list(),G2=list())
              , modelstring=getModelStr(x$params, x$Gdist)
@@ -135,23 +135,32 @@ initCsrBayesGameConfig <- function(x)
   l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
   l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
   l$M[t] <- round(x$db1*l$B$B1[t] + x$db2*l$B$B2[t])
-  l$z[[t]] <- rbinom(l$M[t], 1, l$q)  ##  CHANGING TO GROUND TRUTH  q
+  l$Z$H[t] <- rbinom(1, l$M[t], l$q)  ##  CHANGING TO GROUND TRUTH  q
+  l$Z$U[t] <- l$M[t] - l$Z$H[t]
   l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
   l$L$L2[t] <- ceiling(x$Y / l$p$p2[t])
   
   # LIST demand share
-  l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
-                    x$v1, x$v2,
-                    l$sig$sig1[t], l$sig$sig2[t],
-                    l$J$J1[t], l$J$J2[t],
-                    x$omega, l$z[[t]],
-                    x$epsilon, k=1)
-  l$s.base <- share.base(l$p$p1[t], l$p$p2[t], 
+  # l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
+  #                   x$v1, x$v2,
+  #                   l$sig$sig1[t], l$sig$sig2[t],
+  #                   l$J$J1[t], l$J$J2[t],
+  #                   x$omega, l$z[[t]],
+  #                   x$epsilon, k=1)
+  # l$s.base <- share.base(l$p$p1[t], l$p$p2[t], 
+  #                        x$v1, x$v2,
+  #                        l$sig$sig1[t], l$sig$sig2[t],
+  #                        l$J$J1[t], l$J$J2[t],
+  #                        x$omega, l$z[[t]],
+  #                        x$epsilon, k=1)
+  l$s[[t]] <- expectedShare(l$p$p1[t], l$p$p2[t],
                          x$v1, x$v2,
                          l$sig$sig1[t], l$sig$sig2[t],
                          l$J$J1[t], l$J$J2[t],
-                         x$omega, l$z[[t]],
-                         x$epsilon, k=1)
+                         x$omega, x$epsilon, 
+                         l$Z$H[t], l$Z$U[t], l$M[t],
+                         k=1)
+
   l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
   l$G$G2[[t]] <- getG( 1-l$s[[t]], l$L$L2[t], l$M[t])
   return(l)
@@ -192,21 +201,17 @@ updateGame <- function(x, l, t)
   l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
   
   # SAMPLE MARKET ATTITUDES
-  l$z[[t]] <- rbinom(l$M[t],1, l$q)
+  l$Z$H[t] <- rbinom(1, l$M[t], l$q)  ##  CHANGING TO GROUND TRUTH  q
+  l$Z$U[t] <- l$M[t] - l$Z$H[t]
   
   # LIST demand share
-  l$s[[t]] <- share(l$p$p1[t], l$p$p2[t], 
-                    x$v1, x$v2,
-                    l$sig$sig1[t], l$sig$sig2[t],
-                    l$J$J1[t], l$J$J2[t],
-                    x$omega, l$z[[t]],
-                    x$epsilon, k=1)
-  l$s.base <- share.base(l$p$p1[t], l$p$p2[t], 
+  l$s[[t]] <- expectedShare(l$p$p1[t], l$p$p2[t],
                          x$v1, x$v2,
                          l$sig$sig1[t], l$sig$sig2[t],
                          l$J$J1[t], l$J$J2[t],
-                         x$omega, l$z[[t]],
-                         x$epsilon, k=1)
+                         x$omega, x$epsilon, 
+                         l$Z$H[t], l$Z$U[t], l$M[t],
+                         k=1)
   l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t],dist = l$Gdist)
   l$G$G2[[t]] <- getG(1-l$s[[t]], l$L$L2[t], l$M[t], dist=l$Gdist)
   

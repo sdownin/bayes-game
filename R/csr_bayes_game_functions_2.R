@@ -195,6 +195,30 @@ share.base <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,z,epsilon,k=1)
   return(out)
 }
 
+
+##
+#
+##
+expectedShare <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,zH,zU,N,k=1) {
+  sH <- .share(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,'H',k)
+  sU <- .share(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,'U',k)
+  return( sH*(zH / N) + sU*(zU / N) )
+}
+.share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,z,k=1) {
+  sigk <- ifelse(k==1, sig1, sig2)
+  pk <- ifelse(k==1, p1, p2)
+  vk <- ifelse(k==1, v1, v2)
+  Jk <- ifelse(k==1, J1, J2)
+  ##
+  zval <- ifelse( !is.character(z), z, ifelse(z=='H',1,0) )
+  ## thetas
+  th1 <- p2 * (vk + omega*sig1*zval)
+  th2 <- p1 * (vk + omega*sig2*zval)
+  thk <- pk * (vk + omega*sigk*zval)
+  return( (thk * Jk^epsilon) / ((th1 * J1^epsilon)+(th2 * J2^epsilon)) )
+}
+
+
 ##
 # 
 # @returns list to be used as `x` argument in demand share() function

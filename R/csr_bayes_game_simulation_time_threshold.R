@@ -25,9 +25,9 @@ library(doParallel)
 ##  USING GAME SETUP LIST x
 
 ## Set strategy change periods and total simulation length
-#t1.change.pd <- 5            # platform 1 adds CSR policy at period
+t1.change.pd <- 100            # platform 1 adds CSR policy at period
 t2.change.pd <- 2            # platform 2 adds CSR policy at period
-Tau <- 100 + t2.change.pd   # number of periods
+Tau <- 2000                   # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
@@ -72,9 +72,9 @@ x <- list(t=1
 
 l.list <- list()   #testing:#    i = j = k = l = m = 1
 
-qs <- c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
+qs <- seq(0,1,.1) ##c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
 epsilons <- c(.5,1.05,1.6)  #
-dbs <-  0.05 # c(0.05, 0.1, 0.2) #c(.05,.5)
+dbs <-  0.1 # c(0.05, 0.1, 0.2) #c(.05,.5)
 phis <- 0.1  # c(0.02, 0.1, 0.5)   # CSR cost-base price increase
 t1.changes <- c(10, 30, 90) 
 
@@ -95,15 +95,7 @@ for (i in 1:length(qs)) {
           x$phi1 <- x$phi2 <- phis[l]
           x$t1.change <- t1.changes[m]
           index <- paste0("q",x$q,"_epsilon",x$epsilon,"_db",x$db1,"_phi",x$phi1,"_t1.change",x$t1.change)
-          ##
-          ##
-          ## TODO: - change z sample from (N x Bernoulli(p)) vector
-          ##          to 1 x Binom(N,P)
-          ##      - change share() from N x s(z) --> [k, N-k]
-          ##          to [k x s(z=1), N-k x s(z=0) ]
-          ##
-          ##
-          l.list[[index]] <- playCsrBayesGame(x, verbose = T)  
+          l.list[[index]] <- playCsrBayesGame(x, verbose = F)  
           l.list[[index]]$params <- params
         }
       }
@@ -115,19 +107,20 @@ for (i in 1:length(qs)) {
 # ## load saved binary file as follows:
 # ## load('filename.RData')
 image.file <- sprintf('_uber_l_list_facet_plot_PERIOD_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s_t1_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"),paste(t1.changes,collapse="-"))
-save.image(image.file)
+save(l.list, file=image.file)
 
 
 
 ##--------- PLOT BUYER SHARE -------------------------
 
 ## choose params to display
-db_i <- "0.05"   # "0.05", "0.1", "0.2"
+db_i <- "0.1"   # "0.05", "0.1", "0.2"
 phi_i <- "0.1" # c("0.02","0.1","0.5")
+q_i <- c(0,.02,.05,.1,.2,.3)  # .4
 t1.change_i <- c(10, 30, 90)
 ## subset data by chosen params
 df <- getBasePlotDf(l.list, id.vars=c(names(l.list[[1]]$params), 'period') )
-df <- subset(df, subset=(db %in% db_i & phi %in% phi_i & t1.change %in% t1.change_i))
+df <- subset(df, subset=(db %in% db_i & phi %in% phi_i & t1.change %in% t1.change_i & q %in% q_i))
 
 ## set numerics to factors for plotting
 for(var in names(l.list[[1]]$params))
