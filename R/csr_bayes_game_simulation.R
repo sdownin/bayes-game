@@ -27,7 +27,7 @@ library(doParallel)
 ## Set strategy change periods and total simulation length
 t2.change.pd <- 2                   # platform 2 adds CSR policy at period
 t1.change.pd <- 100 + t2.change.pd  # platform 1 adds CSR policy at period
-Tau <- 1500 + t2.change.pd          # number of periods
+Tau <- 1000 + t2.change.pd          # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
