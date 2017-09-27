@@ -1,6 +1,6 @@
-Bayesian voting with the wallet
+Corporate Social Responsibility Market Signaling
 ======
-*Strategic response to responsible consumption signals under network externalities*
+*CSR as a Strategic Response*
 
-Dowing, S., and Kang, J.S. (2017)
+Dowing, S., Kang, J.S., and Markman, G. (2017) under review
 
