@@ -1,7 +1,5 @@
-Bayesian voting with the wallet
+Corporate Social Responsibility Market Signaling
 ======
-*Strategic response to responsible consumption signals under network externalities*
 
-Dowing, S., and Kang, J.S. (2017)
+Computations for "Opening The Black Box Between Corporate Social Responsibility (CSR) and Corporate Financial Performance (CFP) in Platform Competition." Dowing, S., Kang, J.S., and Markman, G. (Under Review)
 
-This repo contains code for simulations in the manuscript to be submitted to *Management Science*.
