@@ -103,6 +103,89 @@ png('best_response_to_observed_buying_with_wallet.png', height=4.5, width=8.8, u
   }; #mtext("Best Response to Observed Buyers Voting with the Wallet", outer=T, cex=1.5)
 dev.off()
 
+## h = sum of hedonic buyers
+png('best_response_to_observed_buying_with_wallet.png', height=4, width=6, units='in', res=300)
+  par(mfrow=c(1,1), mar=c(4.5,4.5,4.5,1.5), oma=c(0,0,0,0))
+  q <- 1/3
+  Nvec <- c(10,1e4)
+  wvec <- 3 #round(Nvec * q, 0)
+  adjs <- c(.4,.1)
+  frames <- c('(a) No CSR','(b) CSR')
+  for (i in seq_along(wvec)) {
+    # W <- 2
+    W <- wvec[i]
+    N <- Nvec[i]
+    y <- qpost(W, N, a1=.5,a2=.5)
+    x <- seq(0,1,length.out = nrow(y))
+    colors <- c(4,'darkgray')
+    # mainstr <- sprintf('%s  N = %s, h = %s',frames[i],N,W)
+    mainstr <- frames[i]
+    matplot(x, y, 
+            # main=mainstr,
+            xlab = 'Proportion of Hedonic Buyers (q)', 
+            ylab = 'Density',
+            type='o', pch=c(NA), lwd=2:1, lty=1,col=colors)
+    qstar <- 0.51
+    qstarWHAU <- 0.046
+    abline(v=qstar, lty=1)
+    mtext(text = expression(q[A^H*A^U]^"*"), at=qstar, side = 3, cex=.9, padj = .0)
+    abline(v=qstarWHAU, lty=3)
+    mtext(text = expression(q[W^H*A^U]^"*"), at=qstarWHAU, side = 3, cex=.9, padj = .0)
+    qWx <- y$qW* x
+    meanqW <- mean( qWx[qWx>-Inf&qWx<Inf], na.rm = T )
+    cat(sprintf('\nN=%s, W=%s, mean(qW) = %.3f\n',N,W,meanqW))
+    abline(v=meanqW, lty=4)
+    mtext(text = expression(hat(q)), 
+          at=meanqW, side = 3, cex=.9, adj=0,  padj = .0)
+
+    polygon(x=x, y=y$qW, col=rgb(.2,.2,.8,.2))
+    leg.loc <- ifelse(W/N < .5, 'topright', 'topleft')
+    legend(leg.loc,legend=c(expression(q^post)
+                            , expression(q[A^H*A^U]^"*")
+                            , expression(q[W^H*A^U]^"*")
+                            , expression(hat(q))
+                            #,expression(q^A)
+                            #, expression(E[sigma^b==(W*","*A)]*q),
+                            #, expression(q^A -q^W)
+                            #,sprintf('h = %s',W),sprintf('N = %s',N)
+    ),
+    title=sprintf('h = %s, N = %s',W,N),
+    pch=c(NA),lwd=c(3,1,1,1),lty=c(1,1,3,4),col=c(4,1,1,1))
+  }; #mtext("Best Response to Observed Buyers Voting with the Wallet", outer=T, cex=1.5)
+dev.off()
+
+  
+## Mixed strategy
+y <- sapply(0:10,function(x)dbinom(1, x, 1/3))
+yprob <- y/sum(y)
+z <- sapply(0:10,function(x)pbinom(x, 10, 1/3))
+
+matplot(0:10, cbind(yprob,z), type='b')  
+
+mixed.strat <- function(qstar, q, N) {
+  y <- sapply(0:N,function(x)pbinom(x, N, q))
+  df <- data.frame(x=0:10,
+                   CDF=round(y,6),
+                   revCDF=round(1-y,6))
+  return(df)
+}
+
+mixed.strat.l <- function(qstar, q, N) {
+  range <- round((qstar * N)-20):round((qstar*N)+20)
+  y <- sapply(range,function(x)pbinom(x, N, q))
+  df <- data.frame(x=range,
+                   CDF=round(y,6),
+                   revCDF=round(1-y,6))
+  return(df)
+}
+
+
+x <- seq(0.0000001,.9999999,length.out = 1000000)
+qpost <- dbeta(x, 0.5, 1e7 + 0.5)
+qpostx <- qpost * x
+qpostx <- qpostx[!is.nan(qpostx) & !is.na(qpostx)]
+mean(qpostx)
+
 ##------------------------------------------------------
 getPriceNox <- function(sig,epsilon,gamma,phi)
 {

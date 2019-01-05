@@ -100,7 +100,7 @@ initCsrBayesGameConfig <- function(x)
              , Q=data.frame(Q1=rep(0,x$Tau),Q2=rep(0,x$Tau))
              , Pi=data.frame(Pi1=rep(0,x$Tau),Pi2=rep(0,x$Tau))
              , Z=data.frame(H=rep(NA,x$Tau),U=rep(NA,x$Tau))
-             , s=list() 
+             , S=data.frame(S1=rep(NA,x$Tau),S2=rep(NA,x$Tau))
              , G=list(G1=list(),G2=list())
              , modelstring=getModelStr(x$params, x$Gdist)
              , t=x$t
@@ -153,16 +153,17 @@ initCsrBayesGameConfig <- function(x)
   #                        l$J$J1[t], l$J$J2[t],
   #                        x$omega, l$z[[t]],
   #                        x$epsilon, k=1)
-  l$s[[t]] <- expectedShare(l$p$p1[t], l$p$p2[t],
+  l$S$S1[t] <- expectedShare(l$p$p1[t], l$p$p2[t],
                          x$v1, x$v2,
                          l$sig$sig1[t], l$sig$sig2[t],
                          l$J$J1[t], l$J$J2[t],
                          x$omega, x$epsilon, 
                          l$Z$H[t], l$Z$U[t], l$M[t],
                          k=1)
+  l$S$S2[t] <- 1 - l$S$S1[t]
 
-  l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t])
-  l$G$G2[[t]] <- getG( 1-l$s[[t]], l$L$L2[t], l$M[t])
+  l$G$G1[[t]] <- getG(l$S$S1[t], l$L$L1[t], l$M[t])
+  l$G$G2[[t]] <- getG(l$S$S2[t], l$L$L2[t], l$M[t])
   return(l)
 }
 
@@ -190,10 +191,10 @@ updateGame <- function(x, l, t)
   l$M[t] <- ifelse( m.temp <= 1, 1, m.temp)
   l$J$J1[t] <- getJ(x$Y,x$epsilon,l$gamma$gamma1[t],x$c1,l$B$B1[t-1],l$f$f1[t],l$J$J1[t-1],x$dj1) 
   l$J$J2[t] <- getJ(x$Y,x$epsilon,l$gamma$gamma2[t],x$c2,l$B$B2[t-1],l$f$f2[t],l$J$J2[t-1],x$dj2)
-  s1.avg <- sum(l$G$G1[[t-1]]) / (length(l$G$G1[[t-1]])*l$L$L1[t])
-  s2.avg <- sum(l$G$G2[[t-1]]) / (length(l$G$G2[[t-1]])*l$L$L2[t])
-  l$B$B1[t] <- getB(s1.avg, l$M[[t]], l$B$B1[t-1], x$db1)         
-  l$B$B2[t] <- getB(s2.avg, l$M[[t]], l$B$B2[t-1], x$db2) 
+  # s1.avg <- sum(l$G$G1[[t-1]]) / (length(l$G$G1[[t-1]])*l$L$L1[t])
+  # s2.avg <- sum(l$G$G2[[t-1]]) / (length(l$G$G2[[t-1]])*l$L$L2[t])
+  # l$B$B1[t] <- getB(s1.avg, l$M[[t]], l$B$B1[t-1], x$db1)         
+  # l$B$B2[t] <- getB(s2.avg, l$M[[t]], l$B$B2[t-1], x$db2) 
   
   ## CSR-Price-Base-CONTINGENT COSTS
   #cat(sprintf("getPsi: %.10f\n", getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]) ))
@@ -205,15 +206,21 @@ updateGame <- function(x, l, t)
   l$Z$U[t] <- l$M[t] - l$Z$H[t]
   
   # LIST demand share
-  l$s[[t]] <- expectedShare(l$p$p1[t], l$p$p2[t],
+  l$S$S1[t] <- expectedShare(l$p$p1[t], l$p$p2[t],
                          x$v1, x$v2,
                          l$sig$sig1[t], l$sig$sig2[t],
                          l$J$J1[t], l$J$J2[t],
                          x$omega, x$epsilon, 
                          l$Z$H[t], l$Z$U[t], l$M[t],
                          k=1)
-  l$G$G1[[t]] <- getG(l$s[[t]], l$L$L1[t], l$M[t],dist = l$Gdist)
-  l$G$G2[[t]] <- getG(1-l$s[[t]], l$L$L2[t], l$M[t], dist=l$Gdist)
+  l$S$S2[t] <- 1-l$S$S1[t]
+  
+  ## MOVED HERE
+  l$B$B1[t] <- getB(l$S$S1[t], l$M[[t]], l$B$B1[t-1], x$db1)         
+  l$B$B2[t] <- getB(l$S$S2[t], l$M[[t]], l$B$B2[t-1], x$db2) 
+  
+  l$G$G1[[t]] <- getG(l$S$S1[t], l$L$L1[t], l$M[t],dist = l$Gdist)
+  l$G$G2[[t]] <- getG(l$S$S2[t], l$L$L2[t], l$M[t], dist=l$Gdist)
   
   ## LEARN Qhat
   if(x$learn) {

@@ -206,7 +206,7 @@ expectedShare <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,zH,zU,N,k=1)
 }
 .share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,z,k=1) {
   sigk <- ifelse(k==1, sig1, sig2)
-  pk <- ifelse(k==1, p1, p2)
+  pk <- ifelse(k==1, p2, p1)  ## opposite
   vk <- ifelse(k==1, v1, v2)
   Jk <- ifelse(k==1, J1, J2)
   ##

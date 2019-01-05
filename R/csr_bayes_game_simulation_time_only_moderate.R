@@ -14,6 +14,7 @@ library(reshape2)
 library(lattice); library(latticeExtra)
 library(stringr)
 library(foreach)
+library(grid); library(gridBase); library(gridExtra)
 library(doParallel)
 
 ## NOTE: if missing package, run:
@@ -27,7 +28,7 @@ library(doParallel)
 ## Set strategy change periods and total simulation length
 t1.change.pd <- 100            # platform 1 adds CSR policy at period
 t2.change.pd <- 2            # platform 2 adds CSR policy at period
-Tau <- 1800                   # number of periods
+Tau <- 2000                   # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
@@ -38,7 +39,7 @@ x <- list(t=1
           , B1.0=800, B2.0=200  #B1.0=40000000, B2.0=2100000
           #, p1.0=1, p2.0=1    ## price  *MOVED* to be set dynamically as function of CSR policy
           , v1= 1, v2=1        ## utilitarian value
-          , omega=2  ##        ## hedonic value
+          , omega=4  ##        ## hedonic value
           , db1=.1, db2=.1     ## buyer churn:  (db1)% buy all (quantity = y/pk) goods from current platform 2; (1-db1)% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
           , dj1=.1, dj2=.1     ## seller churn
           , c1=.5, c2=.5       ## seller MARGINAL cost
@@ -73,10 +74,10 @@ x <- list(t=1
 l.list <- list()   #testing:#    i = j = k = l = m = 1
 
 qs <- c(0, .2, .4, .6, .8, 1)  # seq(0,1,.1) ##c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
-epsilons <- c(.3, 1.05, 1.9)  #
+epsilons <- 1.05  #c(.3, 1.05, 1.9)  #
 dbs <-  0.1 # c(0.05, 0.1, 0.2) #c(.05,.5)
-phis <- c(0.001, 0.1, 1)   # CSR cost-base price increase
-t1.changes <- 150  #  c(30, 90, 270) # c(20, 80, 320) 
+phis <-  c(0.1, 0.5, 1)   # CSR cost-base price increase
+t1.changes <- 100  #  c(30, 90, 270) # c(20, 80, 320) 
 
 for (i in 1:length(qs)) {
   for (j in 1:length(epsilons)) {
@@ -106,25 +107,27 @@ for (i in 1:length(qs)) {
 # ## UNCOMMENT to SAVE binary (.RData) data file
 # ## load saved binary file as follows:
 # ## load('filename.RData')
-image.file <- sprintf('_uber_l_list_facet_plot_PRICE_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s_t1_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"),paste(t1.changes,collapse="-"))
+image.file <- sprintf('_uber2_l_list_facet_plot_PRICE_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s_t1_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"),paste(t1.changes,collapse="-"))
 save(l.list, file=image.file)
 
-
+l.list.1 <- l.list
 
 ##--------- PLOT BUYER SHARE -------------------------
 
 ## choose params to display
 db_i <- "0.1"   # "0.05", "0.1", "0.2"
-phi_i <- c("0.001","0.1","1")
+phi_i <- c("0.1","0.5","1")
 q_i <- c('0', '0.2', '0.4', '0.6', '0.8', '1')  # .4
 eps_i <- c('1.05')
-t1.change_i <- "150"
+t1.change_i <- "100"
 
 
 ## subset data by chosen params
 df <- getBasePlotDf(l.list, id.vars=c(names(l.list[[1]]$params), 'period') )
-df <- subset(df, subset=(db %in% db_i & phi %in% phi_i & t1.change %in% t1.change_i))
-df <- subset(df, subset=(epsilon %in% eps_i))
+df <- subset(df, subset=(db %in% db_i ))
+df <- subset(df, subset=(phi %in% phi_i ))
+df <- subset(df, subset=(t1.change %in% t1.change_i))
+df <- subset(df, subset=(as.character(epsilon) %in% eps_i))
 df <- subset(df, subset=(as.character(q) %in% q_i))  ## couldn't filter 0.6 as float ?? need to use characters
 
 ## set numerics to factors for plotting
@@ -149,9 +152,9 @@ db_lab <- ifelse(db_num < 0.1, 'Low',ifelse(db_num < 0.2, 'Moderate','High'))
 # getPalette = colorRampPalette(brewer.pal(9, "Set1"))
 
 # make labeller
-labs <- c('Low','Moderate','High')
+labs <- c('1. Low','2. Moderate','3. High')
 labels.epsilon = sapply(seq_along(epsilons), function(x)sprintf("%s Network Effect = %3s",labs[x],epsilons[x]))
-labels.phis = sapply(seq_along(phi_i), function(x)sprintf("%s CSR Premium = %3s",labs[x],phi_i[x]))
+labels.phis = sapply(seq_along(phi_i), function(x)sprintf("%s CSR Markup = %3s",labs[x],phi_i[x]))
 names(labels.epsilon) <- epsilons
 names(labels.phis) <- phi_i
 labels <- c(labels.epsilon, labels.phis)
@@ -163,19 +166,19 @@ legend.guide <- guide_legend(title="Hedonic\nProportion\n(q)")
 ## GGPLOT object
 gg1 <- ggplot(aes(x=period, y=value, colour=q), data=df) + 
   geom_line(aes(colour=q,group=q,lty=q), lwd=1.1) + 
-  facet_grid(phi ~ epsilon, labeller = as_labeller(labels)) + 
+  facet_grid(. ~ phi, labeller = as_labeller(labels)) + 
   geom_point(aes(pch=q), data=df.point)   +
   scale_color_manual(values=colorRamps::matlab.like(colourCount))  +
   geom_vline(xintercept=xintercepts2, lty=1) +
   geom_vline(xintercept=xintercepts1, lty=2) +
   scale_x_log10() + ylim(0,1) +
-  ylab("Buyer Share") + xlab(expression('Time Period ('*log[10]~scale*')')) +
+  ylab("Demand Share (Platform 1)") + xlab('Time Period') +
   guides(color=legend.guide, group=legend.guide,lty=legend.guide,pch=legend.guide) +
   theme_bw() 
 gg1  ## display plot
 
 ## save plot
-file.name <- sprintf("_uber_buyer_base_share_PRICE_6p5-10_not_log_J1_%s_J2_%s_t1_%s_t2_%s_T%s_db_%s_phi_%s_omega_%s.png", x$J1.0, x$J2.0,x$t1.change,x$t2.change,x$Tau,db_i,paste(phi_i,collapse="-"),x$omega)
+file.name <- sprintf("_uber2_buyer_base_share_PRICE_6p5-10_not_log_J1_%s_J2_%s_t1_%s_t2_%s_T%s_db_%s_phi_%s_omega_%s.png", x$J1.0, x$J2.0,x$t1.change,x$t2.change,x$Tau,db_i,paste(phi_i,collapse="-"),x$omega)
 ggsave(file.name, gg1, height=6.5, width=10, units='in')
 ##------------------------------------------------------------
 
@@ -187,10 +190,10 @@ ggsave(file.name, gg1, height=6.5, width=10, units='in')
 l.list <- list()   #testing:#    i = j = k = l = m = 1
 
 qs <- c(0, .2, .4, .6, .8, 1)  # seq(0,1,.1) ##c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
-epsilons <- c(.3, 1.05, 1.9)  #
+epsilons <- 1.05 #c(.3, 1.05, 1.9)  #
 dbs <-  0.1 # c(0.05, 0.1, 0.2) #c(.05,.5)
 phis <- 0.1  # c(0.02, 0.1, 0.5)   # CSR cost-base price increase
-t1.changes <- c(10, 100, 1000)  #  c(30, 90, 270) # c(20, 80, 320) 
+t1.changes <- c(2000, 100, 10)  #  c(30, 90, 270) # c(20, 80, 320) 
 
 for (i in 1:length(qs)) {
   for (j in 1:length(epsilons)) {
@@ -220,29 +223,33 @@ for (i in 1:length(qs)) {
 # ## UNCOMMENT to SAVE binary (.RData) data file
 # ## load saved binary file as follows:
 # ## load('filename.RData')
-image.file <- sprintf('_uber_l_list_facet_plot_PERIOD_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s_t1_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"),paste(t1.changes,collapse="-"))
+image.file <- sprintf('_uber2_l_list_facet_plot_PERIOD_T_%s_w_%s_J1_%s_J2_%s_db_%s_q_%s_t1_%s.RData',x$Tau,x$omega,x$J1.0,x$J2.0,paste(dbs,collapse="-"),paste(qs,collapse="-"),paste(t1.changes,collapse="-"))
 save(l.list, file=image.file)
+
+l.list.2 <- l.list
 
 ##--------- PLOT BUYER SHARE -------------------------
 
 ## choose params to display
 db_i <- "0.1"   # "0.05", "0.1", "0.2"
 phi_i <- "0.1" # c("0.02","0.1","0.5")
+eps_i <- "1.05"
 q_i <- c('0', '0.2', '0.4', '0.6', '0.8', '1')  # .4
-t1.change_i <- t1.changes#c(20, 60, 180)
+t1.change_i <- t1.changes #c(20, 60, 180)
 
 
 ## subset data by chosen params
 df <- getBasePlotDf(l.list, id.vars=c(names(l.list[[1]]$params), 'period') )
 df <- subset(df, subset=(db %in% db_i & phi %in% phi_i & t1.change %in% t1.change_i))
+df <- subset(df, subset=(as.character(epsilon) %in% eps_i))
 df <- subset(df, subset=(as.character(q) %in% q_i))  ## couldn't filter 0.6 as float ?? need to use characters
 
 ## set numerics to factors for plotting
 periods <- c('Early','Mid','Late')
 df$t1.change <- sapply(seq_len(nrow(df)), function(i){
-  if (df$t1.change[i]==t1.changes[1]) return( sprintf('1. Early Response = %s',df$t1.change[i]) )
-  if (df$t1.change[i]==t1.changes[2]) return( sprintf('2. Mid Response = %s',df$t1.change[i]) )
-  if (df$t1.change[i]==t1.changes[3]) return( sprintf('3. Late Response = %s',df$t1.change[i]) )
+  if (df$t1.change[i]==t1.changes[1]) return( sprintf('1. No Response') )
+  if (df$t1.change[i]==t1.changes[2]) return( sprintf('2. Moderate Delay = %s',df$t1.change[i]) )
+  if (df$t1.change[i]==t1.changes[3]) return( sprintf('3. Early Response = %s',df$t1.change[i]) )
 });
 for(var in names(l.list[[1]]$params))
   df[,var] <- factor(df[,var], levels = as.character(sort(unique(df[,var]))))
@@ -282,13 +289,13 @@ legend.guide <- guide_legend(title="Hedonic\nProportion\n(q)")
 ## GGPLOT object
 gg2 <- ggplot(aes(x=period, y=value, colour=q), data=df) + 
   geom_line(aes(colour=q,group=q,lty=q), lwd=1.1) + 
-  facet_grid(t1.change ~ epsilon, labeller = as_labeller(labels)) + 
+  facet_grid(. ~ t1.change, labeller = as_labeller(labels)) + 
   geom_point(aes(pch=q), data=df.point) + 
   scale_color_manual(values=colorRamps::matlab.like(colourCount)) +
   geom_vline(xintercept=xintercepts2, lty=1) +
   geom_vline(aes(xintercept=z), xintercepts1, lty=2) +
   scale_x_log10() + ylim(0,1) +
-  ylab("Buyer Share") + xlab(expression('Time Period ('*log[10]~scale*')')) + 
+  ylab("Demand Share (Platform 1)") + xlab('Time Period') + 
   guides(color=legend.guide, group=legend.guide,lty=legend.guide,pch=legend.guide) +
   theme_bw() 
 gg2  ## display plot
@@ -301,12 +308,14 @@ ggsave(file.name, gg2, height=6.5, width=10, units='in')
 
 ## plot combined
 library(grid)
+library(gridBase)
 library(gridExtra)
 library(cowplot)
 
-png('csrcfp_small_multiples_PRICE_RESPONSE_NET_EFFECTS_plots.png', height=15, width=7.5, units='in', res=250)
+file.name <- sprintf('csrcfp_2c_small_multiples_PRICE_TIME_RESPONSES_plots_omega%s_MANUSCRIPT_2.png', x$omega)
+png(file.name, height=6.5, width=11, units='in', res=250)
 plot_grid(gg1, gg2, 
-          labels=c('A','B'), ncol=1, nrow=2)
+          labels=c('(a)','(b)'), ncol=1, nrow=2)
 dev.off()
 
 
@@ -324,11 +333,12 @@ dev.off()
 
 
 
-
-
-
-
-
+# beta distribution
+a1 = 10
+a2 = 2
+x = seq(0,1,.01)
+density = dbeta(x, a1, a2)
+plot(density ~ x, type = 'o', pch=16)
 
 
 

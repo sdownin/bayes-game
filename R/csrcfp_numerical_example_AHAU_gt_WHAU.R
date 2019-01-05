@@ -346,7 +346,7 @@ library(cowplot)
 .q <- 1/3
 #---------------------------------------
 pl <- list()
-Ns <-   1e7 # c(10,100, 1000, 10000,100000,40000000)
+Ns <-   10 # c(10,100, 1000, 10000,100000,40000000)
 for (p_i in seq_along(Ns)) {
   N <- Ns[p_i]
   g4 <- G$init(q = .q, N=N, reps=.reps)
@@ -374,7 +374,7 @@ for (p_i in seq_along(Ns)) {
     theme_bw() 
   ###
   cat("\nkstarbar");
-  print(round(g4$kstarbar,6))
+  print(round(g4$kstarbar,7))
 }
 
 
@@ -448,150 +448,11 @@ g1$sig.p[[1]]
 
 
 
-### Binomial probability of buyers in small market
-x = 0:10
-CDF = cumsum(round(dbinom(x,max(x),1/3),3))
-data.frame(x=x, CDF=CDF, OneMinusCDF=1-CDF)
-
-
-#----------------------------------------------------------
-#  EXPECTED BUYER SIGNALING COST THRESHOLD
-#-----------------------------------------------------------
-
-hstar = function(qstar, N, a1, a2) {
-  return(ceiling(qstar * (N+a1+a2) - a1 + 1))
-}
-
-
-N = 10
-a1 = 5
-a2 = .5
-
-##############
-# SMALL MARKET
-##############
-
-## 1. NO PRIOR BELIEF
-N = 20
-a1 = .5
-a2 = .5
-kstarbar = function(q,qstar,N=20,a1=.5,a2=.5,dV=100) {
-  hs = hstar(qstar,N,a1,a2)
-  return( dV * choose(N,hs) * q^(hs+1) * (1-q)^(N-hs) )  
-}
-qs = seq(0.00001,.99999,length.out = 200)
-qstars = seq(0.00001,.99999,length.out = 200)
-K = outer(qs,qstars, Vectorize(kstarbar))
-png(sprintf('buyer_expected_sig_cost_thresh_N=%s_a1=%s_a2=%s.png', N,a1,a2), 
-    height = 7, width = 7, units = 'in', res = 200)
-filled.contour(qs, qstars, K,  
-               col=colorRamps::matlab.like2(21),
-               xlab=expression('Hedonic probability '~(q)),
-               ylab=expression('Signaling Threshold (q*)'),
-               main=sprintf('Buyer Signaling Cost Threshold\nN=%s, a1=%s, a2=%s',N,a1,a2))
-dev.off()
-## 2. UTILITARIAN PRIOR BELIEF 
-N = 20
-a1 = .5
-a2 = 10
-kstarbar = function(q,qstar,N=20,a1=.5,a2=10,dV=100) {
-  hs = hstar(qstar,N,a1,a2)
-  return( dV * choose(N,hs) * q^(hs+1) * (1-q)^(N-hs) )  
-}
-qs = seq(0.00001,.99999,length.out = 200)
-qstars = seq(0.00001,.99999,length.out = 200)
-K = outer(qs,qstars, Vectorize(kstarbar))
-png(sprintf('buyer_expected_sig_cost_thresh_N=%s_a1=%s_a2=%s.png', N,a1,a2,qstar), 
-    height = 7, width = 7, units = 'in', res = 200)
-filled.contour(qs, qstars, K,  
-               col=colorRamps::matlab.like2(21),
-               xlab=expression('Hedonic probability '~(q)),
-               ylab=expression('Signaling Threshold (q*)'),
-               main=sprintf('Buyer Signaling Cost Threshold\nN=%s, a1=%s, a2=%s',N,a1,a2))
-dev.off()
-## 3. HEDONIC PRIOR BELIEF 
-N = 20
-a1 = 10
-a2 = .5
-kstarbar = function(q,qstar,N=20,a1=10,a2=.5,dV=100) {
-  hs = hstar(qstar,N,a1,a2)
-  return( dV * choose(N,hs) * q^(hs+1) * (1-q)^(N-hs) )  
-}
-qs = seq(0.00001,.99999,length.out = 200)
-qstars = seq(0.00001,.99999,length.out = 200)
-K = outer(qs,qstars, Vectorize(kstarbar))
-png(sprintf('buyer_expected_sig_cost_thresh_N=%s_a1=%s_a2=%s.png', N,a1,a2), 
-    height = 7, width = 7, units = 'in', res = 200)
-filled.contour(qs, qstars, K,  
-               col=colorRamps::matlab.like2(21),
-               xlab=expression('Hedonic probability '~(q)),
-               ylab=expression('Signaling Threshold (q*)'),
-               main=sprintf('Buyer Signaling Cost Threshold\nN=%s, a1=%s, a2=%s',N,a1,a2))
-dev.off()
-dev.off()
 
 
 
 
 
-#----------------------------------------------------------
-#  Signaling Cost
-#-----------------------------------------------------------
-psiofomega <- function(zi, omega, psi1, eps=1.05, J1=700, J2=300, 
-                       u1=1, u2=1, c1=1, c2=1 ) {
-  A <- u1 / (u2 + omega * zi)
-  B <- (J1/J2)^eps
-  C <- (c1 + psi1) / c1
-  return( log(A * B * C) )
-}
-
-
-par(mfrow=c(1,3))
-##-------------------------------------------------
-omegas <- seq(0,5,length.out = 100)
-psis <- seq(0,2,length.out = 6)
-names(psis) <- round(psis, 2)
-kappa <- sapply(psis, function(psi_i){
-  return( psiofomega(1, omegas, psi_i, eps=0) )
-})
-matplot(omegas, kappa, type='l',  ylim=c(-1.5,3),
-        xlab=expression('CSR Value  '*(omega)),
-        ylab=expression('Signaling Cost  '*(kappa[it])),
-        main=expression('No Network Effect '*epsilon*' = 0'))
-abline(h=0)
-legend('topright',legend = c(round(psis,1)),
-       title=expression('CSR Cost  '*(psi[k])),
-       lty=1:6,col=1:6)
-##----------------------------------------------------
-omegas <- seq(0,5,length.out = 100)
-psis <- seq(0,2,length.out = 6)
-names(psis) <- round(psis, 2)
-kappa <- sapply(psis, function(psi_i){
-  return( psiofomega(1, omegas, psi_i, eps=1) )
-})
-matplot(omegas, kappa, type='l', ylim=c(-1.5,3),
-        xlab=expression('CSR Value  '*(omega)),
-        ylab=expression('Signaling Cost  '*(kappa[it])),
-        main=expression('Moderate Network Effect '*epsilon*' = 1'))
-abline(h=0)
-legend('topright',legend = c(round(psis,1)),
-       title=expression('CSR Cost  '*(psi[k])),
-       lty=1:6,col=1:6)
-##----------------------------------------------------
-omegas <- seq(0,5,length.out = 100)
-psis <- seq(0,2,length.out = 6)
-names(psis) <- round(psis, 2)
-kappa <- sapply(psis, function(psi_i){
-  return( psiofomega(1, omegas, psi_i, eps=2) )
-})
-matplot(omegas, kappa, type='l', ylim=c(-1.5,3),
-        xlab=expression('CSR Value  '*(omega)),
-        ylab=expression('Signaling Cost  '*(kappa[it])),
-        main=expression('High Network Effect '*epsilon*' = 2'))
-abline(h=0)
-legend('topright',legend = c(round(psis,1)),
-       title=expression('CSR Cost  '*(psi[k])),
-       lty=1:6,col=1:6)
 
 
 #----------------------------------------------------------
