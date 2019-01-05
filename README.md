@@ -1,5 +1,4 @@
-Corporate Social Responsibility Market Signaling
+Bayesian Market Signaling Game Simulation
 ======
 
-Computations for "Opening The Black Box Between Corporate Social Responsibility (CSR) and Corporate Financial Performance (CFP) in Platform Competition." Dowing, S., Kang, J.S., and Markman, G. (Under Review)
-
+Analysis of conditions underwhich a target chooses to respond or not respond to a price or CSR attack.
