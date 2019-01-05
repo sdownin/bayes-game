@@ -27,34 +27,36 @@ library(colorRamps)
 ##  USING GAME SETUP LIST x
 
 ## Set strategy change periods and total simulation length
-t1.change.pd <- 100            # platform 1 adds CSR policy at period
-t2.change.pd <- 2            # platform 2 adds CSR policy at period
+t2.change.pd <- 2             # platform 2 attacks:  CSR policy at period t2
+t1.change.pd <- 100           # platform 1 resonds:  CSR policy at period t1
 Tau <- 2000                   # number of periods
 
 ## GAME CONFIG
 x <- list(t=1
-          , q= .5              ## hedonic probability by nature (proportion)
-          , epsilon = 1        ## indirect network effects
-          , params=c('q')      ## parmeters to be 'learned' by gibbs sampling
           , J1.0=200, J2.0=50 #J1.0=100000, J2.0=10000 ## Initial sellers on platforms
           , B1.0=800, B2.0=200  #B1.0=40000000, B2.0=2100000
-          #, p1.0=1, p2.0=1    ## price  *MOVED* to be set dynamically as function of CSR policy
           , v1= 1, v2=1        ## utilitarian value
           , omega=4  ##        ## hedonic value
-          , db1=.1, db2=.1     ## buyer churn:  (db1)% buy all (quantity = y/pk) goods from current platform 2; (1-db1)% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
           , dj1=.1, dj2=.1     ## seller churn
           , c1=.5, c2=.5       ## seller MARGINAL cost
           , gamma1=.2, gamma2=.2  ## seller CSR cost 
           , phi1 =.4, phi2 =.4    ## platfom CSR cost
           , w1=.02, w2=.02        ## Platform operator MARGINAL cost
-          # , psi1=.02, psi2=.02  ## Platform operator CSR cost   *MOVED* --> function of (gamma, B, y, p1)
           , a1=1, a2=1        ## time constant
           , r1=.1, r2=.1      ## platform transaction fee (percent of price)
           , growth=.01        ## ** currently not using 
           , Y=100             ## budget
           , ep=1              ## downweighted below
           , Tau=Tau           ## number of periods in simulation
-          , probs=c(.005,.025,.5,.975,.995)  ## quantiles of estimated parameter to keep
+          ## SET RANGES OF PARAM VALUES FOR PLTOTING BELOW
+          # , q= .5              ## hedonic probability by nature (proportion)
+          # , epsilon = 1        ## indirect network effects
+          #, p1.0=1, p2.0=1    ## price  *MOVED* to be set dynamically as function of CSR policy
+          # , db1=.1, db2=.1     ## buyer churn:  (db1)% buy all (quantity = y/pk) goods from current platform 2; (1-db1)% defect to multihome buying s1*(y/p1) from Plat 1, s2*(y/p2) from Plat 2
+          # , psi1=.02, psi2=.02  ## Platform operator CSR cost   *MOVED* --> function of (gamma, B, y, p1)
+          ## Deprecated in current version 
+          , params=c('q')      ## parmeters to be 'learned' by gibbs sampling
+          , probs=c(.005,.025,.5,.975,.995)  ## ** don't need ##  quantiles of estimated parameter to keep
           , learningThreshold=.05            ## ** don't need
           , n.iter=100                       ## ** don't need
           , t1.change=t1.change.pd, t2.change=t2.change.pd    ## ** don't need
@@ -173,7 +175,7 @@ gg1 <- ggplot(aes(x=period, y=value, colour=q), data=df) +
   geom_vline(xintercept=xintercepts2, lty=1) +
   geom_vline(xintercept=xintercepts1, lty=2) +
   scale_x_log10() + ylim(0,1) +
-  ylab("Demand Share (Platform 1)") + xlab('Time Period') +
+  ylab("Buyer Share (Platform 1)") + xlab('Time Period') +
   guides(color=legend.guide, group=legend.guide,lty=legend.guide,pch=legend.guide) +
   theme_bw() 
 gg1  ## display plot
@@ -296,7 +298,7 @@ gg2 <- ggplot(aes(x=period, y=value, colour=q), data=df) +
   geom_vline(xintercept=xintercepts2, lty=1) +
   geom_vline(aes(xintercept=z), xintercepts1, lty=2) +
   scale_x_log10() + ylim(0,1) +
-  ylab("Demand Share (Platform 1)") + xlab('Time Period') + 
+  ylab("Buyer Share (Platform 1)") + xlab('Time Period') + 
   guides(color=legend.guide, group=legend.guide,lty=legend.guide,pch=legend.guide) +
   theme_bw() 
 gg2  ## display plot

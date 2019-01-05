@@ -1,17 +1,17 @@
-library(rjags)
+# library(rjags)
 library(ggplot2)
 library(coda)
-library(mcmcplots)
+# library(mcmcplots)
 library(lattice)
 library(latticeExtra)
 library(plyr)
 library(parallel)
-library(fields)
-library(random)
-library(foreach)
-library(snow)
+# library(fields)
+# library(random)
+# library(foreach)
+# library(snow)
 
-setwd('C:\\Users\\sdowning\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
+setwd('C:\\Users\\T430\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
 
 
 #--------------------------- FUNCTIONS -----------------------------------------
