@@ -199,22 +199,22 @@ share.base <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,z,epsilon,k=1)
 ##
 #
 ##
-expectedShare <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,zH,zU,N,k=1) {
-  sH <- .share(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,'H',k)
-  sU <- .share(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,'U',k)
+expectedShare <- function(p1,p2,v1,v2,gamma1,gamma2,J1,J2,omega,epsilon,zH,zU,N,k=1) {
+  sH <- .share(p1,p2,v1,v2,gamma1,gamma2,J1,J2,omega,epsilon,'H',k)
+  sU <- .share(p1,p2,v1,v2,gamma1,gamma2,J1,J2,omega,epsilon,'U',k)
   return( sH*(zH / N) + sU*(zU / N) )
 }
-.share <- function(p1,p2,v1,v2,sig1,sig2,J1,J2,omega,epsilon,z,k=1) {
-  sigk <- ifelse(k==1, sig1, sig2)
+.share <- function(p1,p2,v1,v2,gamma1,gamma2,J1,J2,omega,epsilon,z,k=1) {
+  gammak <- ifelse(k==1, gamma1, gamma2)
   pk <- ifelse(k==1, p2, p1)  ## opposite
   vk <- ifelse(k==1, v1, v2)
   Jk <- ifelse(k==1, J1, J2)
   ##
   zval <- ifelse( !is.character(z), z, ifelse(z=='H',1,0) )
   ## thetas
-  th1 <- p2 * (vk + omega*sig1*zval)
-  th2 <- p1 * (vk + omega*sig2*zval)
-  thk <- pk * (vk + omega*sigk*zval)
+  th1 <- p2 * (vk + omega*gamma1*zval)
+  th2 <- p1 * (vk + omega*gamma2*zval)
+  thk <- pk * (vk + omega*gammak*zval)
   return( (thk * Jk^epsilon) / ((th1 * J1^epsilon)+(th2 * J2^epsilon)) )
 }
 
@@ -625,23 +625,30 @@ getPrice <- function(k, x, t)
 #   return((1+epsilon)*(c + sig*gamma + sig*phi))
 # }
 
-getPriceFromCsrMarkup <- function(sig,epsilon,gamma,phiMarkup, c=1, verbose=FALSE)
+getPriceFromCsrMarkup <- function(epsilon,gamma, c=1, verbose=FALSE)
 {
-  p0 <- (1+epsilon)*(c + sig*gamma)
-  price <- p0 * (1 + phiMarkup)
-  if(verbose) cat(sprintf('phi = %.3f\n',(price-p0)/(1+epsilon)))
+  price <- (1+epsilon)*(c + gamma)
+  if(verbose) cat(sprintf('price from CSR markup = %.3f\n',price))
   return(price)
 }
 
-getPriceFromCsrMarkup <- function(sig,epsilon,gamma,phiMarkup, c=1, verbose=FALSE)
+getPriceFromCsrAndDiscountAction <- function(epsilon,gamma,discount, c=1, verbose=FALSE)
 {
-  ## IGNORE GAMMA USE PHIMARKUP AS COST `psi`
-  p0 <- c
-  basePrice <- p0 * (1 + phiMarkup)
-  price <- basePrice * (1+epsilon)
-  # if(verbose) cat(sprintf('phi = %.3f\n',(price-p0)/(1+epsilon)))
+  discount.safe <- min(discount, epsilon)
+  price <- (1+epsilon-discount.safe)*(c + gamma)
+  if(verbose) cat(sprintf('PRICE(gamma,discount) = %.3f; discount > epsilon (warning?): %s\n',price, discount>epsilon))
   return(price)
 }
+
+# getPriceFromCsrMarkup <- function(sig,epsilon,gamma,phiMarkup, c=1, verbose=FALSE)
+# {
+#   ## IGNORE GAMMA USE PHIMARKUP AS COST `psi`
+#   p0 <- c
+#   basePrice <- p0 * (1 + phiMarkup)
+#   price <- basePrice * (1+epsilon)
+#   # if(verbose) cat(sprintf('phi = %.3f\n',(price-p0)/(1+epsilon)))
+#   return(price)
+# }
 
 ##
 #

@@ -83,7 +83,13 @@ initCsrBayesGameConfig <- function(x)
              , M=rep(0,x$Tau)
              , sim=list()
              , p=data.frame(p1=rep(NA, x$Tau), p2=rep(NA, x$Tau))
-             , gamma=data.frame(gamma1=rep(0,x$Tau), gamma2=rep(0,x$Tau))
+             # , gamma=data.frame(gamma1=rep(0,x$Tau), gamma2=rep(0,x$Tau))
+             ##-----COMPETITIVE ACTIONS---------
+             , gamma=data.frame(gamma1=c(rep(0,x$t1.change),rep(x$gamma1,x$Tau-x$t1.change)),
+                                gamma2=c(rep(0,x$t2.change),rep(x$gamma2,x$Tau-x$t2.change)) )
+             , discount=data.frame(discount1=c(rep(0,x$t1.change),rep(x$discount1,x$Tau-x$t1.change)),
+                                   discount2=c(rep(0,x$t2.change),rep(x$discount2,x$Tau-x$t2.change)) )
+             ##----------------------------------
              , psi=data.frame(psi1=rep(0,x$Tau), psi2=rep(0,x$Tau))
              , f=data.frame(f1=rep(1,x$Tau), f2=rep(1,x$Tau))
              , O=data.frame(O1=rep(1,x$Tau), O2=rep(1,x$Tau))
@@ -95,9 +101,9 @@ initCsrBayesGameConfig <- function(x)
              , s.diff=rep(0,x$Tau)
              , q.hat=rep(NA,x$Tau)
              , bss=rep(NA,x$Tau)
-             , sig=data.frame(sig1=c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change)),
-                              sig2=c(rep(0,x$t2.change),rep(1,x$Tau-x$t2.change)) )
-             , phi=data.frame(phi1=rep(NA,x$Tau),phi2=rep(NA,x$Tau))
+             # , sig=data.frame(sig1=c(rep(0,x$t1.change),rep(1,x$Tau-x$t1.change)),
+             #                  sig2=c(rep(0,x$t2.change),rep(1,x$Tau-x$t2.change)) )
+             , phi=data.frame(phi1=rep(x$phi1,x$Tau),phi2=rep(x$phi2,x$Tau))
              , Q=data.frame(Q1=rep(0,x$Tau),Q2=rep(0,x$Tau))
              , Pi=data.frame(Pi1=rep(0,x$Tau),Pi2=rep(0,x$Tau))
              , Z=data.frame(H=rep(NA,x$Tau),U=rep(NA,x$Tau))
@@ -116,10 +122,10 @@ initCsrBayesGameConfig <- function(x)
   t <- l$t
   
   ## CSR strategy costs
-  l$phi$phi1 <- sapply(l$sig$sig1, function(s)ifelse(s==1,x$phi1,0))
-  l$phi$phi2 <- sapply(l$sig$sig2, function(s)ifelse(s==1,x$phi2,0))
-  l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1,x$gamma2, 0)
-  l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
+  # l$phi$phi1 <- sapply(l$sig$sig1, function(s)ifelse(s==1,x$phi1,0))
+  # l$phi$phi2 <- sapply(l$sig$sig2, function(s)ifelse(s==1,x$phi2,0))
+  # l$gamma$gamma1[t] <- ifelse(,x$gamma2, 0)
+  # l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
   
   for (param in x$params) {
     l$est[[param]] <- data.frame( L99=rep(0,x$Tau),L95=rep(0,x$Tau), mu=rep(0,x$Tau), U95=rep(0,x$Tau),U99=rep(0,x$Tau) )
@@ -131,10 +137,10 @@ initCsrBayesGameConfig <- function(x)
   l$J$J2[t] <- x$J2.0
   l$B$B1[t] <- ifelse('B1.0' %in%names(x), x$B1.0, 4 * l$J$J1[t])
   l$B$B2[t] <- ifelse('B2.0' %in%names(x), x$B2.0, 4 * l$J$J2[t])
-  l$p$p1[t] <- getPriceFromCsrMarkup(l$sig$sig1[t],l$epsilon,l$gamma$gamma1[t],l$phi$phi1[t], x$c1)   #getPrice(1, x, t)
-  l$p$p2[t] <- getPriceFromCsrMarkup(l$sig$sig2[t],l$epsilon,l$gamma$gamma2[t],l$phi$phi2[t], x$c2)  #getPrice(2, x, t)
-  l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
-  l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
+  l$p$p1[t] <- getPriceFromCsrAndDiscountAction(l$epsilon,l$gamma$gamma1[t],l$discount$discount1[t], x$c1, FALSE)   #getPrice(1, x, t)
+  l$p$p2[t] <- getPriceFromCsrAndDiscountAction(l$epsilon,l$gamma$gamma2[t],l$discount$discount2[t], x$c2, FALSE)  #getPrice(2, x, t)
+  l$psi$psi1[t] <- 0 # ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
+  l$psi$psi2[t] <- 0 # ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
   l$M[t] <- round(x$db1*l$B$B1[t] + x$db2*l$B$B2[t])
   l$Z$H[t] <- rbinom(1, l$M[t], l$q)  ##  CHANGING TO GROUND TRUTH  q
   l$Z$U[t] <- l$M[t] - l$Z$H[t]
@@ -156,7 +162,7 @@ initCsrBayesGameConfig <- function(x)
   #                        x$epsilon, k=1)
   l$S$S1[t] <- expectedShare(l$p$p1[t], l$p$p2[t],
                          x$v1, x$v2,
-                         l$sig$sig1[t], l$sig$sig2[t],
+                         l$gamma$gamma1[t], l$gamma$gamma2[t],
                          l$J$J1[t], l$J$J2[t],
                          x$omega, x$epsilon, 
                          l$Z$H[t], l$Z$U[t], l$M[t],
@@ -176,12 +182,14 @@ initCsrBayesGameConfig <- function(x)
 updateGame <- function(x, l, t)
 {
   ## CSR CONTINGENT COSTS
-  l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1, x$gamma1, 0)
-  l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
+  # l$gamma$gamma1[t] <- ifelse(l$sig$sig1[t]==1, x$gamma1, 0)
+  # l$gamma$gamma2[t] <- ifelse(l$sig$sig2[t]==1, x$gamma2, 0)
   
   ## PERIOD PARAMETERS
-  l$p$p1[t] <- getPriceFromCsrMarkup(l$sig$sig1[t],l$epsilon,l$gamma$gamma1[t],l$phi$phi1[t], x$c1)   #getPrice(1, x, t)
-  l$p$p2[t] <- getPriceFromCsrMarkup(l$sig$sig2[t],l$epsilon,l$gamma$gamma2[t],l$phi$phi2[t], x$c2)
+  # l$p$p1[t] <- getPriceFromCsrMarkup(l$sig$sig1[t],l$epsilon,l$gamma$gamma1[t],l$phi$phi1[t], x$c1)   #getPrice(1, x, t)
+  # l$p$p2[t] <- getPriceFromCsrMarkup(l$sig$sig2[t],l$epsilon,l$gamma$gamma2[t],l$phi$phi2[t], x$c2)
+  l$p$p1[t] <- getPriceFromCsrAndDiscountAction(l$epsilon,l$gamma$gamma1[t],l$discount$discount1[t], x$c1, FALSE)   #getPrice(1, x, t)
+  l$p$p2[t] <- getPriceFromCsrAndDiscountAction(l$epsilon,l$gamma$gamma2[t],l$discount$discount2[t], x$c2, FALSE)  #getPrice(2, x, t)
   l$f$f1[t] <- 1
   l$f$f2[t] <- 1
   l$L$L1[t] <- ceiling(x$Y / l$p$p1[t])
@@ -199,8 +207,8 @@ updateGame <- function(x, l, t)
   
   ## CSR-Price-Base-CONTINGENT COSTS
   #cat(sprintf("getPsi: %.10f\n", getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]) ))
-  l$psi$psi1[t] <- ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
-  l$psi$psi2[t] <- ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
+  l$psi$psi1[t] <- 0 # ifelse(l$sig$sig1[t]==1, getPsi(l$gamma$gamma1[t],x$Y,l$p$p1[t],l$B$B1[t]), 0)
+  l$psi$psi2[t] <- 0 # ifelse(l$sig$sig2[t]==1, getPsi(l$gamma$gamma2[t],x$Y,l$p$p2[t],l$B$B2[t]), 0)
   
   # SAMPLE MARKET ATTITUDES
   l$Z$H[t] <- rbinom(1, l$M[t], l$q)  ##  CHANGING TO GROUND TRUTH  q
@@ -209,7 +217,7 @@ updateGame <- function(x, l, t)
   # LIST demand share
   l$S$S1[t] <- expectedShare(l$p$p1[t], l$p$p2[t],
                          x$v1, x$v2,
-                         l$sig$sig1[t], l$sig$sig2[t],
+                         l$gamma$gamma1[t], l$gamma$gamma2[t],
                          l$J$J1[t], l$J$J2[t],
                          x$omega, x$epsilon, 
                          l$Z$H[t], l$Z$U[t], l$M[t],
@@ -238,110 +246,110 @@ updateGame <- function(x, l, t)
   
   return(l)
 }
-
-##
-#
-#
-##
-learnBayesParams <- function(x,l,t)
-{ 
-  cat(sprintf('Starting MCMC%s %s iterations\n', ifelse(x$parallel, paste0(' in parallel on ',x$n.cores,' cores'),''),l$n.iter))
-  l$s.diff[t] <- mean(l$s[[t]]) - mean(l$s.base)
-  s.cumu <- sum(unlist(l$G$G1)) / sum(unlist(c(l$G$G1,l$G$G2)))
-  ## Learn customer type by demand groups
-  cl <- getDemandClusters(l, t, k='auto', maxcl = 2, all = FALSE)
-  l$bss[t] <- getBetweenSS(cl)
-  if ( (l$sig$sig1[t] != l$sig$sig2[t]) & (l$bss[t] > x$cl.cutoff) ) {
-    plotDemandGroups(l$G$G1[[t]],cl)
-    Z <- getZ(x,cl,t)
-    h1 <- sum(Z)
-    h2 <- length(Z) - h1
-    l$q.hat[t] <- h1 / length(Z)
-    ## LEARNING params HERE ...
-    l$h$h1[t] = ifelse(t==1, x$a1, l$h$h1[t-1]) + h1 * x$ep #downweight
-    l$h$h2[t] = ifelse(t==1, x$a2, l$h$h2[t-1]) + h2 * x$ep #downweight
-    l$shape[t] = ifelse(t==1,1,l$shape[t-1])  + mean(l$G$G1[t-1])*length(l$G$G1)*x$ep
-    l$rate[t] = ifelse(t==1,1,l$rate[t-1])    + length(l$G$G1)*x$ep
-  } else {
-    ## NOT LEARNING HERE ...
-    l$h$h1[t] = ifelse(t==1,x$a1,l$h$h1[t-1])
-    l$h$h2[t] = ifelse(t==1,x$a2,l$h$h2[t-1])
-    l$shape[t] = ifelse(t==1,1,l$shape[t-1])
-    l$rate[t] = ifelse(t==1,1,l$rate[t-1])
-  }
-  ## -----------------
-  data <- list(G=l$G$G1[t][[1]],  
-               L=l$L$L1[t], 
-               n=l$M[t]-1,  ## NO Z HERE
-               sig1=l$sig$sig1[t], 
-               sig2=l$sig$sig2[t],
-               J1=l$J$J1[t],
-               J2=l$J$J2[t],
-               p1=l$p$p1[t],
-               p2=l$p$p2[t],
-               v1=x$v1,
-               v2=x$v2,
-               omega= ifelse(x$q==0,0,x$omega),    ## ensure no signal when q=0
-               h1t=l$h$h1[t],
-               h2t=l$h$h2[t])
-  if ( 'epsilon' %in% x$params) {
-    data$shapet <- l$shape[t]
-    data$ratet <- l$rate[t] 
-  }
-  if ( !('epsilon' %in% x$params) ) data$epsilon <- l$epsilon
-  if ( !('q' %in% x$params)       ) data$q <- l$q
-  
-  ##
-  # l$param.inits <- list()
-  # for (param in x$params) {
-  #   l$param.inits[[param]] <- ifelse(param=='q',rbeta(1,l$h$h1[t],l$h$h2[t]),ifelse(param=='epsilon',rgamma(1,1,1),rnorm(1)))
-  # }
-  
-  rngs <- c("base::Super-Duper", "base::Mersenne-Twister",
-            "base::Wichmann-Hill", "base::Marsaglia-Multicarry")
-  l$param.inits <- list()
-  for (i in 1:x$n.cores) {
-    l$param.inits[[paste0("inits",i)]] <- list()
-    if ('q' %in% x$params) l$param.inits[[paste0("inits",i)]]$q <- rbeta(1,l$h$h1[t],l$h$h2[t])
-    if ('epsilon' %in% x$params) l$param.inits[[paste0("inits",i)]]$epsilon <- rgamma(1,1,1)
-    l$param.inits[[paste0("inits",i)]]$.RNG.name <- rngs[i]
-    l$param.inits[[paste0("inits",i)]]$.RNG.seed <- 12340+i
-  }
-  
-  # inits1 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[1], ".RNG.seed"=12341)
-  # inits2 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[2], ".RNG.seed"=12342)
-  # inits3 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[3], ".RNG.seed"=12343)
-  # inits4 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[4], ".RNG.seed"=12344)
-  # l$param.inits <- function(){
-  #   list(inits1=inits1,inits2=inits2,inits3=inits3,inits4=inits4)
-  # }
-  
-  ### JAGS object if not parallel or MCMC object if parallel
-  # if(x$parallel) {
-  #   l$sim[[t]] <- runMcmcPar(l,x,t)
-  # } else {
-  #   l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter.update=x$n.iter)
-  #   l$sim[[t]]$run(data, l$param.inits, parallel = x$parallel, period=t) #envir=environment(),
-  # }
-  #
-  l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter=l$n.iter, method=x$method)
-  l$sim[[t]]$run(data = data, inits = l$param.inits, parallel = x$parallel,envir = environment(), period=t) #envir=environment(),
-  
-  
-  # if ( !x$parallel & length(x$params) > 1) {
-  #   l$sim[[t]]$bivarPlot(x$params[1], x$params[2], chain=1) 
-  # }
-  if (length(x$params) > 1) {
-    bivarPlot(l$sim[[t]]$mcmc, x$params[1], x$params[2], chain=1)
-  }
-  
-  ## estimate and credible intervals
-  for (param in x$params) {
-    l$est[[param]][t, ] <- getParamEst(l$sim[[t]]$mcmc, param, probs=x$probs, burninProportion = .2)
-  }
-  
-  return(l)
-}
+# 
+# ##
+# #
+# #
+# ##
+# learnBayesParams <- function(x,l,t)
+# { 
+#   cat(sprintf('Starting MCMC%s %s iterations\n', ifelse(x$parallel, paste0(' in parallel on ',x$n.cores,' cores'),''),l$n.iter))
+#   l$s.diff[t] <- mean(l$s[[t]]) - mean(l$s.base)
+#   s.cumu <- sum(unlist(l$G$G1)) / sum(unlist(c(l$G$G1,l$G$G2)))
+#   ## Learn customer type by demand groups
+#   cl <- getDemandClusters(l, t, k='auto', maxcl = 2, all = FALSE)
+#   l$bss[t] <- getBetweenSS(cl)
+#   if ( (l$sig$sig1[t] != l$sig$sig2[t]) & (l$bss[t] > x$cl.cutoff) ) {
+#     plotDemandGroups(l$G$G1[[t]],cl)
+#     Z <- getZ(x,cl,t)
+#     h1 <- sum(Z)
+#     h2 <- length(Z) - h1
+#     l$q.hat[t] <- h1 / length(Z)
+#     ## LEARNING params HERE ...
+#     l$h$h1[t] = ifelse(t==1, x$a1, l$h$h1[t-1]) + h1 * x$ep #downweight
+#     l$h$h2[t] = ifelse(t==1, x$a2, l$h$h2[t-1]) + h2 * x$ep #downweight
+#     l$shape[t] = ifelse(t==1,1,l$shape[t-1])  + mean(l$G$G1[t-1])*length(l$G$G1)*x$ep
+#     l$rate[t] = ifelse(t==1,1,l$rate[t-1])    + length(l$G$G1)*x$ep
+#   } else {
+#     ## NOT LEARNING HERE ...
+#     l$h$h1[t] = ifelse(t==1,x$a1,l$h$h1[t-1])
+#     l$h$h2[t] = ifelse(t==1,x$a2,l$h$h2[t-1])
+#     l$shape[t] = ifelse(t==1,1,l$shape[t-1])
+#     l$rate[t] = ifelse(t==1,1,l$rate[t-1])
+#   }
+#   ## -----------------
+#   data <- list(G=l$G$G1[t][[1]],  
+#                L=l$L$L1[t], 
+#                n=l$M[t]-1,  ## NO Z HERE
+#                sig1=l$sig$sig1[t], 
+#                sig2=l$sig$sig2[t],
+#                J1=l$J$J1[t],
+#                J2=l$J$J2[t],
+#                p1=l$p$p1[t],
+#                p2=l$p$p2[t],
+#                v1=x$v1,
+#                v2=x$v2,
+#                omega= ifelse(x$q==0,0,x$omega),    ## ensure no signal when q=0
+#                h1t=l$h$h1[t],
+#                h2t=l$h$h2[t])
+#   if ( 'epsilon' %in% x$params) {
+#     data$shapet <- l$shape[t]
+#     data$ratet <- l$rate[t] 
+#   }
+#   if ( !('epsilon' %in% x$params) ) data$epsilon <- l$epsilon
+#   if ( !('q' %in% x$params)       ) data$q <- l$q
+#   
+#   ##
+#   # l$param.inits <- list()
+#   # for (param in x$params) {
+#   #   l$param.inits[[param]] <- ifelse(param=='q',rbeta(1,l$h$h1[t],l$h$h2[t]),ifelse(param=='epsilon',rgamma(1,1,1),rnorm(1)))
+#   # }
+#   
+#   rngs <- c("base::Super-Duper", "base::Mersenne-Twister",
+#             "base::Wichmann-Hill", "base::Marsaglia-Multicarry")
+#   l$param.inits <- list()
+#   for (i in 1:x$n.cores) {
+#     l$param.inits[[paste0("inits",i)]] <- list()
+#     if ('q' %in% x$params) l$param.inits[[paste0("inits",i)]]$q <- rbeta(1,l$h$h1[t],l$h$h2[t])
+#     if ('epsilon' %in% x$params) l$param.inits[[paste0("inits",i)]]$epsilon <- rgamma(1,1,1)
+#     l$param.inits[[paste0("inits",i)]]$.RNG.name <- rngs[i]
+#     l$param.inits[[paste0("inits",i)]]$.RNG.seed <- 12340+i
+#   }
+#   
+#   # inits1 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[1], ".RNG.seed"=12341)
+#   # inits2 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[2], ".RNG.seed"=12342)
+#   # inits3 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[3], ".RNG.seed"=12343)
+#   # inits4 <- list("q"=rbeta(1,l$h$h1[t],l$h$h2[t]), "epsilon"=rgamma(1,1,1), ".RNG.name"=rngs[4], ".RNG.seed"=12344)
+#   # l$param.inits <- function(){
+#   #   list(inits1=inits1,inits2=inits2,inits3=inits3,inits4=inits4)
+#   # }
+#   
+#   ### JAGS object if not parallel or MCMC object if parallel
+#   # if(x$parallel) {
+#   #   l$sim[[t]] <- runMcmcPar(l,x,t)
+#   # } else {
+#   #   l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter.update=x$n.iter)
+#   #   l$sim[[t]]$run(data, l$param.inits, parallel = x$parallel, period=t) #envir=environment(),
+#   # }
+#   #
+#   l$sim[[t]] <- JAGS$new(l$modelstring, x$params, n.iter=l$n.iter, method=x$method)
+#   l$sim[[t]]$run(data = data, inits = l$param.inits, parallel = x$parallel,envir = environment(), period=t) #envir=environment(),
+#   
+#   
+#   # if ( !x$parallel & length(x$params) > 1) {
+#   #   l$sim[[t]]$bivarPlot(x$params[1], x$params[2], chain=1) 
+#   # }
+#   if (length(x$params) > 1) {
+#     bivarPlot(l$sim[[t]]$mcmc, x$params[1], x$params[2], chain=1)
+#   }
+#   
+#   ## estimate and credible intervals
+#   for (param in x$params) {
+#     l$est[[param]][t, ] <- getParamEst(l$sim[[t]]$mcmc, param, probs=x$probs, burninProportion = .2)
+#   }
+#   
+#   return(l)
+# }
 
 
 ##

@@ -6,6 +6,7 @@
 *.csv*
 *.xls*
 *.xlsx*
+*.rds*
 
 *.RData*
 .RData*
