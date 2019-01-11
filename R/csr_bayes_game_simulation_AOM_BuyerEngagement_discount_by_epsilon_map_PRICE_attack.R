@@ -24,17 +24,17 @@ library(colorRamps)
 x <- list(Tau=2200           ## number of periods in simulation
           ##-------ATTACK-----------
           , gamma2 =    0       # CSR action (0 < gamma2 < (1-c2)) #where c is marginal cost
-          , discount2 = .2   # PRICE  (0 < discount2 <= epsilon)
+          , discount2 = 1.2   # PRICE  (1 < discount2 <= Beta)
           , t2.change = 2    # platform 2 attacks:  PRICE policy at period t2
           ##----------------------------
           , J1.0=200, J2.0=50 #J1.0=100000, J2.0=10000 ## Initial sellers on platforms
           , B1.0=800, B2.0=200  #B1.0=40000000, B2.0=2100000
           , v1= 1, v2=1        ## utilitarian value
-          , omega=80  ##        ## hedonic value
+          , omega=20  ##        ## hedonic value
           , dj1=.1, dj2=.1     ## seller churn
           , c1=.5, c2=.5       ## seller MARGINAL cost
-          , b1=0, b2=0         ## price discount     ***** PRICE ACTION *****
-          , gamma1=.2, gamma2=.2  ## seller CSR cost ****** CSR ACTION ******
+          # , b1=0, b2=0         ## price discount     ***** PRICE ACTION *****
+          # , gamma1=.2, gamma2=.2  ## seller CSR cost ****** CSR ACTION ******
           , phi1 =.4, phi2 =.4    ## platfom CSR cost
           , w1=.02, w2=.02        ## Platform operator MARGINAL cost
           , a1=1, a2=1        ## time constant
@@ -67,8 +67,8 @@ x <- list(Tau=2200           ## number of periods in simulation
 ##-----------------------------------------
 ## SIMULATION SETTSIN FOR ALL SIMULATIONS
 ##-----------------------------------------
-n   <- 18  ## granularity (length of contingency vectors to simulate)
-t2r <- 100 ## response timing (if the response action is CSR or PRICE)
+n   <- 12  ## granularity (length of contingency vectors to simulate)
+t2r <- 100  ## response timing (if the response action is CSR or PRICE)
 
 
 #=====================================================================
@@ -76,17 +76,19 @@ t2r <- 100 ## response timing (if the response action is CSR or PRICE)
 #---------------------------------------------------------------------
 
 ##----RESPONSE ACTION (platform 2) ------------
-gamma1s    <- 0 # CSR action (0 < gamma1 < (1-c1)) #where c is marginal cost
-discount1s <- 0 # PRICE  (0 < discount1 <= epsilon)
+gamma1s    <- 0 # CSR action (0 < gamma1 < (1-c1)) #where c1 is marginal cost
+discount1s <- 0 # PRICE  (1 < discount1 <= beta)
 t1.changes <- x$Tau  #  c(30, 90, 270) # c(20, 80, 320) 
 ##-----FIXED PARAMS-----------------------------
 dbs <-  0.1 # sellers churn # c(0.05, 0.1, 0.2) #c(.05,.5)
 ##----CONTINGENCIES TO TEST---------------------
-qs <- round(seq(0,1, length.out = n), 2)  # seq(0,1,.1) ##c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
-epsilons <- round(seq(0.2,2, length.out = n), 2)  #
+qs <- .6 # round(seq(0,1, length.out = n), 2)  # seq(0,1,.1) ##c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
+discounts <- round(seq(0,1, length.out = n), 2)  # as proportion of beta in Price=beta*c;  discount price = dis*beta*c
+epsilons <- round(seq(.1,2, length.out = n), 2)  #
 ##----init data objects-------------------------
 l.list <- list()  
-z  <- matrix(NA, nrow = length(epsilons), ncol=length(qs), dimnames = list(rownames=epsilons,colnames=qs))
+z  <- matrix(NA, nrow = length(epsilons), ncol=length(discounts), dimnames = list(rownames=epsilons,colnames=discounts))
+BE <- matrix(NA, nrow = length(epsilons), ncol=length(discounts), dimnames = list(rownames=epsilons,colnames=discounts))
 
 
 ## RUN
@@ -117,6 +119,7 @@ for (i in 1:length(qs)) {
             l.list[[index]]$params <- params
             ##
             z[j,i] <- l.list[[index]]$B$B1[x$Tau] / sum(l.list[[index]]$B[x$Tau, ])
+            BE[j,i] <- l.list[[index]]$B$B1[x$Tau] / sum(l.list[[index]]$B[x$Tau, ])
             count <- count+1            
           }
         }
@@ -132,7 +135,7 @@ for (i in 1:length(qs)) {
 
 idstr <- sprintf('_uber_l_list_facet_plot_PRICE_NoResponse_T_%s_w_%s_J1_%s_J2_%s_gamma1_%s_discount1_%s_gn_%s_t1_%s',
                  x$Tau,x$omega,x$J1.0,x$J2.0,x$gamma1,x$discount1,n,paste(t1.changes,collapse="-")) 
-saveRDS(l.list, file=sprintf("%s.rds",idstr))
+save(l.list, file=sprintf("%s.rds",idstr))
 
 ## CREATE PLOT COORDS
 tz <- t(z)
@@ -163,11 +166,12 @@ t1.changes <- t2r # x$Tau  #  c(30, 90, 270) # c(20, 80, 320)
 ##-----FIXED PARAMS-----------------------------
 dbs <-  0.1 # sellers churn # c(0.05, 0.1, 0.2) #c(.05,.5)
 ##----CONTINGENCIES TO TEST---------------------
-qs <- .5 # round(seq(0,1, length.out = n), 2)  # seq(0,1,.1) ##c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
+qs <- round(seq(0,1, length.out = n), 2)  # seq(0,1,.1) ##c(0,.02,.05,.1,.2,.3,.4) # c(0,.2,.4,.6,.8,1)  #seq(0,1,.1)
 epsilons <- round(seq(0.2,2, length.out = n), 2)  #
 ##----init data objects-------------------------
 l.list <- list()  
 z <- matrix(NA, nrow = length(epsilons), ncol=length(qs), dimnames = list(rownames=epsilons,colnames=qs))
+BE <- matrix(NA, nrow = length(epsilons), ncol=length(qs), dimnames = list(rownames=epsilons,colnames=qs))
 
 ## RUN
 count <- 1
@@ -211,7 +215,7 @@ for (i in 1:length(qs)) {
 # ## load('filename.RData')
 idstr <- sprintf('_uber_l_list_facet_plot_PRICE_PRICE_T_%s_w_%s_J1_%s_J2_%s_gamma1_%s_discount1_%s_gn_%s_t1_%s',
                  x$Tau,x$omega,x$J1.0,x$J2.0,x$gamma1,x$discount1,n,paste(t1.changes,collapse="-")) 
-saveRDS(l.list, file=sprintf("%s.rds",idstr))
+save(l.list, file=sprintf("%s.rds",idstr))
 
 ## CREATE PLOT COORDS
 tz <- t(z)
@@ -248,6 +252,7 @@ epsilons <- round(seq(0.2,2, length.out = n), 2)  #
 ##----init data objects-------------------------
 l.list <- list()  
 z <- matrix(NA, nrow = length(epsilons), ncol=length(qs), dimnames = list(rownames=epsilons,colnames=qs))
+BE <- matrix(NA, nrow = length(epsilons), ncol=length(qs), dimnames = list(rownames=epsilons,colnames=qs))
 
 ## RUN
 count <- 1
@@ -291,7 +296,7 @@ for (i in 1:length(qs)) {
 # ## load('filename.RData')
 idstr <- sprintf('_uber_l_list_facet_plot_PRICE_CSR_T_%s_w_%s_J1_%s_J2_%s_gamma1_%s_discount1_%s_gn_%s_t1_%s',
                  x$Tau,x$omega,x$J1.0,x$J2.0,x$gamma1,x$discount1,n,paste(t1.changes,collapse="-")) 
-saveRDS(l.list, file=sprintf("%s.rds",idstr))
+save(l.list, file=sprintf("%s.rds",idstr))
 
 ## CREATE PLOT COORDS
 tz <- t(z)

@@ -32,7 +32,7 @@ x <- list(Tau=2200           ## number of periods in simulation
           , J1.0=200, J2.0=50 #J1.0=100000, J2.0=10000 ## Initial sellers on platforms
           , B1.0=800, B2.0=200  #B1.0=40000000, B2.0=2100000
           , v1= 1, v2=1        ## utilitarian value
-          , omega=20  ##        ## hedonic value
+          , omega=80  ##        ## hedonic value
           , dj1=.1, dj2=.1     ## seller churn
           , c1=.5, c2=.5       ## seller MARGINAL cost
           , b1=0, b2=0         ## price discount     ***** PRICE ACTION *****
@@ -69,8 +69,8 @@ x <- list(Tau=2200           ## number of periods in simulation
 ##-----------------------------------------
 ## SIMULATION SETTSIN FOR ALL SIMULATIONS
 ##-----------------------------------------
-n   <- 12  ## granularity (length of contingency vectors to simulate)
-t2r <- 80  ## response timing (if the response action is CSR or PRICE)
+n   <- 18  ## granularity (length of contingency vectors to simulate)
+t2r <- 100  ## response timing (if the response action is CSR or PRICE)
 
 #=====================================================================
 #----------------- 1. NO RESPONSE SIMULATION ----------------------
@@ -98,29 +98,29 @@ for (i in 1:length(qs)) {
       for (m in 1:length(t1.changes)) {
         for (a in 1:length(gamma1s)) {
           for (b in 1:length(discount1s)) {
-            
+            params <- list( q=qs[i], 
+                            epsilon=epsilons[j], 
+                            db=dbs[k],
+                            t1.response=ifelse(t1.changes[m]>=x$Tau,'NO',
+                                               ifelse(gamma1s[a]>0,'CSR',
+                                                      ifelse(discount1s[b]>0,'PRICE','?'))))
+            print(sapply(names(params),function(name)sprintf("%s",params[name])))
+            x$q <- qs[i]
+            x$epsilon <- epsilons[j]
+            x$db1 <- x$db2 <- dbs[k]
+            x$gamma1 <- gamma1s[a]       ## RESPONSE ACTION: CSR
+            x$discount1 <- discount1s[b] ## RESPONSE ACTION: PRICE
+            x$t1.change <- t1.changes[m] ## RESPONSE TIMING
+            index <- sprintf("q%s_epsilon%s_db%s_gamma1_%s_t1change%s_discount1_%s",
+                             x$q, x$epsilon, x$db1, x$gamma1, x$t1.change, x$discount1)
+            l.list[[index]] <- playCsrBayesGame(x, verbose = F)  
+            l.list[[index]]$params <- params
+            ##
+            z[j,i] <- l.list[[index]]$B$B1[x$Tau] / sum(l.list[[index]]$B[x$Tau, ])
+            count <- count+1            
           }
         }
-        params <- list( q=qs[i], 
-                        epsilon=epsilons[j], 
-                        db=dbs[k],
-                        t1.response=ifelse(t1.changes[m]>=x$Tau,'NO',
-                                           ifelse(gamma1s[a]>0,'CSR',
-                                                  ifelse(discount1s[b]>0,'PRICE','?'))))
-        print(sapply(names(params),function(name)sprintf("%s",params[name])))
-        x$q <- qs[i]
-        x$epsilon <- epsilons[j]
-        x$db1 <- x$db2 <- dbs[k]
-        x$gamma1 <- gamma1s[a]       ## RESPONSE ACTION: CSR
-        x$discount1 <- discount1s[b] ## RESPONSE ACTION: PRICE
-        x$t1.change <- t1.changes[m] ## RESPONSE TIMING
-        index <- sprintf("q%s_epsilon%s_db%s_gamma1_%s_t1change%s_discount1_%s",
-                         x$q, x$epsilon, x$db1, x$gamma1, x$t1.change, x$discount1)
-        l.list[[index]] <- playCsrBayesGame(x, verbose = F)  
-        l.list[[index]]$params <- params
-        ##
-        z[j,i] <- l.list[[index]]$B$B1[x$Tau] / sum(l.list[[index]]$B[x$Tau, ])
-        count <- count+1
+
       }
       #}
     }
@@ -133,7 +133,7 @@ for (i in 1:length(qs)) {
 
 idstr <- sprintf('_uber_l_list_facet_plot_CSR_NoResponse_T_%s_w_%s_J1_%s_J2_%s_gamma1_%s_discount1_%s_gn_%s_t1_%s',
                     x$Tau,x$omega,x$J1.0,x$J2.0,x$gamma1,x$discount1,n,paste(t1.changes,collapse="-")) 
-save(l.list, file=sprintf("%s.rds",idstr))
+saveRDS(l.list, file=sprintf("%s.rds",idstr))
 
 ## CREATE PLOT COORDS
 tz <- t(z)
@@ -179,29 +179,29 @@ for (i in 1:length(qs)) {
       for (m in 1:length(t1.changes)) {
         for (a in 1:length(gamma1s)) {
           for (b in 1:length(discount1s)) {
-            
+            params <- list( q=qs[i], 
+                            epsilon=epsilons[j], 
+                            db=dbs[k],
+                            t1.response=ifelse(t1.changes[m]>=x$Tau,'NO',
+                                               ifelse(gamma1s[a]>0,'CSR',
+                                                      ifelse(discount1s[b]>0,'PRICE','?'))))
+            print(sapply(names(params),function(name)sprintf("%s",params[name])))
+            x$q <- qs[i]
+            x$epsilon <- epsilons[j]
+            x$db1 <- x$db2 <- dbs[k]
+            x$gamma1 <- gamma1s[a]       ## RESPONSE ACTION: CSR
+            x$discount1 <- discount1s[b] ## RESPONSE ACTION: PRICE
+            x$t1.change <- t1.changes[m] ## RESPONSE TIMING
+            index <- sprintf("q%s_epsilon%s_db%s_gamma1_%s_t1change%s_discount1_%s",
+                             x$q, x$epsilon, x$db1, x$gamma1, x$t1.change, x$discount1)
+            l.list[[index]] <- playCsrBayesGame(x, verbose = F)  
+            l.list[[index]]$params <- params
+            ##
+            z[j,i] <- l.list[[index]]$B$B1[x$Tau] / sum(l.list[[index]]$B[x$Tau, ])
+            count <- count+1            
           }
         }
-        params <- list( q=qs[i], 
-                        epsilon=epsilons[j], 
-                        db=dbs[k],
-                        t1.response=ifelse(t1.changes[m]>=x$Tau,'NO',
-                                           ifelse(gamma1s[a]>0,'CSR',
-                                                  ifelse(discount1s[b]>0,'PRICE','?'))))
-        print(sapply(names(params),function(name)sprintf("%s",params[name])))
-        x$q <- qs[i]
-        x$epsilon <- epsilons[j]
-        x$db1 <- x$db2 <- dbs[k]
-        x$gamma1 <- gamma1s[a]       ## RESPONSE ACTION: CSR
-        x$discount1 <- discount1s[b] ## RESPONSE ACTION: PRICE
-        x$t1.change <- t1.changes[m] ## RESPONSE TIMING
-        index <- sprintf("q%s_epsilon%s_db%s_gamma1_%s_t1change%s_discount1_%s",
-                         x$q, x$epsilon, x$db1, x$gamma1, x$t1.change, x$discount1)
-        l.list[[index]] <- playCsrBayesGame(x, verbose = F)  
-        l.list[[index]]$params <- params
-        ##
-        z[j,i] <- l.list[[index]]$B$B1[x$Tau] / sum(l.list[[index]]$B[x$Tau, ])
-        count <- count+1
+
       }
       #}
     }
@@ -213,7 +213,7 @@ for (i in 1:length(qs)) {
 # ## load('filename.RData')
 idstr <- sprintf('_uber_l_list_facet_plot_CSR_PRICE_T_%s_w_%s_J1_%s_J2_%s_gamma1_%s_discount1_%s_gn_%s_t1_%s',
                  x$Tau,x$omega,x$J1.0,x$J2.0,x$gamma1,x$discount1,n,paste(t1.changes,collapse="-")) 
-save(l.list, file=sprintf("%s.rds",idstr))
+saveRDS(l.list, file=sprintf("%s.rds",idstr))
 
 ## CREATE PLOT COORDS
 tz <- t(z)
@@ -260,29 +260,29 @@ for (i in 1:length(qs)) {
       for (m in 1:length(t1.changes)) {
         for (a in 1:length(gamma1s)) {
           for (b in 1:length(discount1s)) {
-            
+            params <- list( q=qs[i], 
+                            epsilon=epsilons[j], 
+                            db=dbs[k],
+                            t1.response=ifelse(t1.changes[m]>=x$Tau,'NO',
+                                               ifelse(gamma1s[a]>0,'CSR',
+                                                      ifelse(discount1s[b]>0,'PRICE','?'))))
+            print(sapply(names(params),function(name)sprintf("%s",params[name])))
+            x$q <- qs[i]
+            x$epsilon <- epsilons[j]
+            x$db1 <- x$db2 <- dbs[k]
+            x$gamma1 <- gamma1s[a]       ## RESPONSE ACTION: CSR
+            x$discount1 <- discount1s[b] ## RESPONSE ACTION: PRICE
+            x$t1.change <- t1.changes[m] ## RESPONSE TIMING
+            index <- sprintf("q%s_epsilon%s_db%s_gamma1_%s_t1change%s_discount1_%s",
+                             x$q, x$epsilon, x$db1, x$gamma1, x$t1.change, x$discount1)
+            l.list[[index]] <- playCsrBayesGame(x, verbose = F)  
+            l.list[[index]]$params <- params
+            ##
+            z[j,i] <- l.list[[index]]$B$B1[x$Tau] / sum(l.list[[index]]$B[x$Tau, ])
+            count <- count+1            
           }
         }
-        params <- list( q=qs[i], 
-                        epsilon=epsilons[j], 
-                        db=dbs[k],
-                        t1.response=ifelse(t1.changes[m]>=x$Tau,'NO',
-                                           ifelse(gamma1s[a]>0,'CSR',
-                                                  ifelse(discount1s[b]>0,'PRICE','?'))))
-        print(sapply(names(params),function(name)sprintf("%s",params[name])))
-        x$q <- qs[i]
-        x$epsilon <- epsilons[j]
-        x$db1 <- x$db2 <- dbs[k]
-        x$gamma1 <- gamma1s[a]       ## RESPONSE ACTION: CSR
-        x$discount1 <- discount1s[b] ## RESPONSE ACTION: PRICE
-        x$t1.change <- t1.changes[m] ## RESPONSE TIMING
-        index <- sprintf("q%s_epsilon%s_db%s_gamma1_%s_t1change%s_discount1_%s",
-                         x$q, x$epsilon, x$db1, x$gamma1, x$t1.change, x$discount1)
-        l.list[[index]] <- playCsrBayesGame(x, verbose = F)  
-        l.list[[index]]$params <- params
-        ##
-        z[j,i] <- l.list[[index]]$B$B1[x$Tau] / sum(l.list[[index]]$B[x$Tau, ])
-        count <- count+1
+
       }
       #}
     }
@@ -294,7 +294,7 @@ for (i in 1:length(qs)) {
 # ## load('filename.RData')
 idstr <- sprintf('_uber_l_list_facet_plot_CSR_CSR_T_%s_w_%s_J1_%s_J2_%s_gamma1_%s_discount1_%s_gn_%s_t1_%s',
                  x$Tau,x$omega,x$J1.0,x$J2.0,x$gamma1,x$discount1,n,paste(t1.changes,collapse="-")) 
-save(l.list, file=sprintf("%s.rds",idstr))
+saveRDS(l.list, file=sprintf("%s.rds",idstr))
 
 ## CREATE PLOT COORDS
 tz <- t(z)
