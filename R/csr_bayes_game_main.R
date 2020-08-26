@@ -3,7 +3,7 @@
 # CSR Bayes Game Main Simulation
 #
 ##
-setwd('C:\\Users\\steph\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
+# setwd('C:\\Users\\steph\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
 
 source(file.path(getwd(),'R','csr_bayes_game_functions_2.R'))
 # source(file.path(getwd(),'R','bvwg_r6_jags.R'))      # {.GLOBAL} JAGS

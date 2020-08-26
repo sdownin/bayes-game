@@ -11,7 +11,7 @@ library(parallel)
 # library(foreach)
 # library(snow)
 
-setwd('C:\\Users\\steph\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
+# setwd('C:\\Users\\steph\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
 
 
 #--------------------------- FUNCTIONS -----------------------------------------

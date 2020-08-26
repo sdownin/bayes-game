@@ -5,11 +5,15 @@
 #
 ##
 
+wkdir <- 'C:\\users\\sdr8y\\research\\csr_nonresponse\\bayes-game'
+# wkdir <- 'C:\\Users\\steph\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game'
+
+
 ## SET YOUR WORKING DIRECTORY HERE, like the format below:
-setwd('C:\\Users\\steph\\Google Drive\\PhD\\Dissertation\\5. platform differentiation\\bayes-game')
+setwd(wkdir)
 # setwd()
 
-source(file.path(getwd(),'R','csr_bayes_game_main.R'))
+source(file.path(wkdir,'R','csr_bayes_game_main.R'))
 library(ggplot2)
 library(reshape2)
 library(lattice); library(latticeExtra)
