@@ -127,8 +127,20 @@ for (i in 1:length(qs)) {
   }
 }
 
-plot(x=rownames(z),y=1-z, type='l', 
+matplot(x=rownames(z),y=1-z, type='l', 
      xlab='Network Effect', ylab='Attacker Demand Share (Cumulative Threat)')
+
+## CREATE PLOT COORDS
+tz <- t(z)
+xx <- 1-qs
+yy <- epsilons
+
+par(mar=c(4.2,4.2,3,1))
+filled.contour(xx, yy, tz,  
+               col=colorRamps::matlab.like2(21),
+               xlab=expression('Buyer Heterogeneity '),
+               ylab=expression('Network Effect '),
+               main=sprintf("Platform 1 Equilibrium Demand Share\nCSR Cost %.2f, Response Pd %s, Hedonic Value %.2f", x$phi1, t1.changes[1],x$omega))
 
 
 # ## UNCOMMENT to SAVE binary (.RData) data file
